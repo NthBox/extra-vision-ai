@@ -1,0 +1,7 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+- continue on to phase and tasks
+- use nvm use node for latest node version

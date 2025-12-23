@@ -1,0 +1,9 @@
+---
+alwaysApply: false
+---
+# 4) Fast-forward merge into dev-v185/worktree-dreams-proactiveContext-oracles (no merge commit)
+git checkout dev-v185/worktree-dreams-proactiveContext-oracles
+git merge --ff-only feature-v02/llm-oracles-simplify-uiux
+
+# 5) Push dev-v185/worktree-dreams-proactiveContext-oracles
+# git push origin dev-v185/worktree-dreams-proactiveContext-oracles

@@ -1,0 +1,8 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+create file <folder-name>-checklist.md if it does not exist
+write checklist <folder-name>-checklist.md inside folder <folder-name>
+based on and derived from <folder-name>-tasks.md

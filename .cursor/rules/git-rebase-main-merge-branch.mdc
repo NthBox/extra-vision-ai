@@ -1,0 +1,9 @@
+---
+alwaysApply: false
+---
+# 4) Fast-forward merge into main (no merge commit)
+git checkout main
+git merge --ff-only <feature/your-branch>
+
+# 5) Push main
+# git push origin main

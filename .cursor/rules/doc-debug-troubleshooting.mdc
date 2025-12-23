@@ -1,0 +1,14 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+review process of debugging and troubleshooting to reach the solution
+
+write and update file name format <foldername>-<new-issue-name>-debug-troubleshoot.md
+- if these are new issues append new documenation and do not delete, overwrite previous logs
+- note debug methods
+- note troubleshoot methods
+- note appraches that worked
+- note and remember and write down for this experience to prevent it from happening again
+

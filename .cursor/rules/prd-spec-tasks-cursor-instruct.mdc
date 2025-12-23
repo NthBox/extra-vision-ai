@@ -1,0 +1,36 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+Follow these steps sequentially:
+
+- create files under current folder and use the folder name as prefix
+-- <foldername>-prd.md
+-- <foldername>-spec.md
+-- <foldername>-tasks.md
+
+
+- review existing code base and write new and udpated <foldername>-prd.md 
+```
+read <foldername>-prd-llm.md and analyze how to implement the <foldername>-prd-llm plan with the existing code base and update the new prd <foldername>-prd.md;
+
+use best practice design patterns, code style, and file structure patterns, non descructive and modular coding pattern ; do not code only 
+
+update <foldername>-prd.md ; only target changes and updates in codebase that uses nextjs ; do not add new code, files, or folders outside scope file structure
+
+prd should making changes to only in the project folder
+```
+
+- write spec based on <foldername>-prd.md and <foldername>-prod-llm.md;
+```
+use <foldername>-spec.md <foldername>-prd.md <foldername>-prd-llm.md 
+write and update the spec <foldername>-spec.md  using prd <foldername>-prd.md
+```
+
+- write tasks based on prd and spec
+```
+use <foldername>-spec.md <foldername>-prd.md <foldername>-tasks.md 
+
+plan and write the each tasks <foldername>-tasks.md  for incremental implementation to validate each task before moving forward using spec <foldername>-spec.md and prd<foldername>-prd.md
+```

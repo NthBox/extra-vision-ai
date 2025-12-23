@@ -1,0 +1,14 @@
+name = "extra-vision-inference-production"
+main = "index.ts"
+compatibility_date = "2024-01-01"
+
+[vars]
+ROBOFLOW_WORKSPACE = "purple"
+ROBOFLOW_WORKFLOW_ID = "find-people-cars-dogs-animals-cyclists-bicycles-motorcycles-scooters-vans-semi-trucks-trucks-electric-scooters-school-buses-ambulance-lights-buses-police-cruisers-police-motorcycles-police-suvs-police-cars-ambulances-firetrucks-wheelchairs-and-cats"
+
+[env.staging]
+name = "extra-vision-inference-staging"
+[env.staging.vars]
+ROBOFLOW_WORKSPACE = "purple"
+ROBOFLOW_WORKFLOW_ID = "find-people-cars-dogs-animals-cyclists-bicycles-motorcycles-scooters-vans-semi-trucks-trucks-electric-scooters-school-buses-ambulance-lights-buses-police-cruisers-police-motorcycles-police-suvs-police-cars-ambulances-firetrucks-wheelchairs-and-cats"
+

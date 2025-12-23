@@ -1,0 +1,8 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+- git status to see what the current branch name
+- always git add . to <current-branch-name>
+- write git commit verbose comment with bullet points this one time using the current branch name

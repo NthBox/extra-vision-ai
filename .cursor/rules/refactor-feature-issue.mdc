@@ -1,0 +1,5 @@
+---
+alwaysApply: false
+---
+write a refactor document about refactoring the new feature, or fixing issue; refactoring < discussion above> 
+save as <descriptive refactore filename>.md markdown

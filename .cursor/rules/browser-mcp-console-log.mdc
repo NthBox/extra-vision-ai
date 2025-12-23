@@ -1,0 +1,7 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+read the browser mcp console; only read the console
+i tested the voice did not make a sythesize call

@@ -1,0 +1,5 @@
+---
+alwaysApply: false
+---
+deploy update to cloudflare workers;
+run test validation on changes

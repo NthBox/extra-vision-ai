@@ -1,0 +1,8 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+@doc-problem-solution.mdc
+@/manyme-web-debug-troubleshooting 
+@git-commit.mdc 

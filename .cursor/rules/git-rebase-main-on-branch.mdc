@@ -1,0 +1,22 @@
+---
+alwaysApply: false
+---
+# 0) Safety: bookmark your branch ref
+git checkout <feature/your-branch>
+git branch backup-<feature/your-branch>
+
+# 1) Update main
+git checkout main
+git pull --ff-only origin main
+
+# 2) Rebase your branch onto latest main
+git checkout <feature/your-branch>
+git rebase main
+# (resolve conflicts if any)
+# after fixing a file: git add <file>
+# continue:             git rebase --continue
+# abort if needed:      git rebase --abort
+
+# 3) Verify history is linear and dates are preserved (author dates shown)
+git log --graph --oneline --decorate -20
+git log --pretty=format:'%h %ad | %an <%ae> | %s' --date=short -10

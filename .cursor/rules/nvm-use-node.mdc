@@ -1,0 +1,4 @@
+---
+alwaysApply: false
+---
+use nvm use node with cli command to use latest system node version everytime the cli is used the first time

@@ -1,0 +1,15 @@
+---
+description: browser use for test
+globs: 
+alwaysApply: false
+---
+After making changes, test it in the browser at https://manyme.app/chat
+
+using the browswermcp. assume the server is already running.
+assume user is already logged in
+<!-- login ignore
+username: manymeapp+browsermcp-cursor@gmail.com
+password: 7c16bc28-5369-467e-ba14-cbdaa2afd26f -->
+
+click the input box to highlight to begin typing
+type a message and hit enter to submit prompt

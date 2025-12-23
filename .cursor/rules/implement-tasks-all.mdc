@@ -1,0 +1,7 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+implement all tasks one by one
+validate current task then move on to the next task until completion

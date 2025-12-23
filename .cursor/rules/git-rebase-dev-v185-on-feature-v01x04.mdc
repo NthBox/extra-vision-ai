@@ -1,0 +1,23 @@
+---
+alwaysApply: false
+---
+# 0) Safety: bookmark your branch ref
+git checkout feature-v01x04/proactive-context-proactive-context-queue
+git branch backup-feature-v01x04/proactive-context-proactive-context-queue
+
+# 1) Update dev-v185/worktree-dreams-proactiveContext-oracles
+git checkout dev-v185/worktree-dreams-proactiveContext-oracles
+git pull --ff-only origin dev-v185/worktree-dreams-proactiveContext-oracles
+
+# 2) Rebase your branch onto latest dev-v185/worktree-dreams-proactiveContext-oracles
+#    Using -X theirs to prefer base branch (dev-v185) code during conflicts
+git checkout feature-v01x04/proactive-context-proactive-context-queue
+git rebase -X theirs dev-v185/worktree-dreams-proactiveContext-oracles
+# (resolve conflicts if any - base branch dev-v185 takes precedence)
+# after fixing a file: git add <file>
+# continue:             git rebase --continue
+# abort if needed:      git rebase --abort
+
+# 3) Verify history is linear and dates are preserved (author dates shown)
+git log --graph --oneline --decorate -20
+git log --pretty=format:'%h %ad | %an <%ae> | %s' --date=short -10
