@@ -14,6 +14,7 @@
     },
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.extravisionai.app",
       "infoPlist": {
         "NSCameraUsageDescription": "This app uses the camera for real-time vision processing."
       }
@@ -28,6 +29,12 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "0636c85d-33a4-4d1d-863c-91351d2bdd0a"
+      }
+    },
+    "owner": "atruenetwork"
   }
 }

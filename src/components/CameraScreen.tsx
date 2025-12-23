@@ -25,32 +25,54 @@ export const CameraScreen = () => {
       try {
         const photo = await cameraRef.current.takePictureAsync({
           base64: true,
-          quality: 0.5, // Reduced quality for faster transfer
-          scale: 0.5,   // Reduced scale
-          skipProcessing: true,
+          quality: 0.3, // Lowered quality further to reduce buffer size
+          scale: 0.5,
+          // Removed skipProcessing: true as it can cause 'Image could not be captured' on some devices
         });
 
         if (photo?.base64) {
           runInference(photo.base64);
         }
-      } catch (error) {
-        console.error('Failed to capture frame:', error);
+      } catch (error: any) {
+        // Handle common errors more gracefully
+        const msg = error.message || '';
+        if (msg.includes('Camera unmounted') || msg.includes('Image could not be captured')) {
+          // These are common during startup or if the loop is too fast, ignore for cleaner logs
+          return;
+        }
+        console.error('Inference capture error:', error);
       }
     }
   }, [isCameraReady, isInferring, runInference]);
 
-  // Inference Loop
+  // Inference Loop using sequential timeout to prevent overlap
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isCameraReady) {
-      interval = setInterval(() => {
-        captureFrame();
-      }, 100); // Target ~10 FPS
-    }
-    return () => {
-      if (interval) clearInterval(interval);
+    let isMounted = true;
+    let timeoutId: NodeJS.Timeout;
+
+    const loop = async () => {
+      if (!isMounted) return;
+      
+      // Add a small initial delay to ensure hardware is truly ready
+      if (isCameraReady && !isInferring) {
+        await captureFrame();
+      }
+      
+      // Dynamic delay: longer if it failed, shorter if it's working
+      // Target ~5-10 FPS to keep the camera buffer clear
+      timeoutId = setTimeout(loop, 150); 
     };
-  }, [isCameraReady, captureFrame]);
+
+    if (isCameraReady) {
+      // Small delay after onCameraReady before starting the loop
+      timeoutId = setTimeout(loop, 500);
+    }
+
+    return () => {
+      isMounted = false;
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [isCameraReady, isInferring, captureFrame]);
 
   if (!permission) {
     return <View style={styles.container}><Text>Requesting permissions...</Text></View>;
@@ -74,17 +96,15 @@ export const CameraScreen = () => {
         ref={cameraRef}
         onCameraReady={() => setIsCameraReady(true)}
         responsiveOrientationWhenOrientationLocked
-      >
-        <HUDOverlay />
-        <View style={styles.overlay}>
-          {/* HUD Overlay will be placed here */}
-          <View style={styles.statusContainer}>
-            <Text style={styles.statusText}>
-              {isInferring ? 'Detecting...' : `Objects: ${detections.length}`}
-            </Text>
-          </View>
+      />
+      <HUDOverlay />
+      <View style={styles.overlay} pointerEvents="none">
+        <View style={styles.statusContainer}>
+          <Text style={styles.statusText}>
+            {isInferring ? 'Detecting...' : `Objects: ${detections.length}`}
+          </Text>
         </View>
-      </CameraView>
+      </View>
     </View>
   );
 };
@@ -98,7 +118,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   overlay: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'transparent',
     justifyContent: 'flex-end',
     alignItems: 'center',

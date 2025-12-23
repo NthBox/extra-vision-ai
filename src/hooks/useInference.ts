@@ -1,7 +1,9 @@
 import { useMutation } from '@tanstack/react-query';
+import Constants from 'expo-constants';
 import { useVisionStore, Detection } from '../store/useVisionStore';
 
-const INFERENCE_WORKER_URL = 'http://localhost:8787'; // Default for local development
+const INFERENCE_WORKER_URL = 
+  Constants.expoConfig?.extra?.inferenceWorkerUrl || 'http://localhost:8787';
 
 export const useInference = () => {
   const { setDetections, setInferring, updateInferenceTime } = useVisionStore();

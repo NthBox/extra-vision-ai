@@ -12,5 +12,8 @@
   "type": "commonjs",
   "devDependencies": {
     "wrangler": "^4.56.0"
+  },
+  "dependencies": {
+    "expo-dev-client": "~6.0.20"
   }
 }
