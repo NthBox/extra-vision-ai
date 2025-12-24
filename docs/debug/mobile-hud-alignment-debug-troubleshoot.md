@@ -22,9 +22,11 @@ Bounding boxes from Roboflow inference were "way off" and not lining up with the
     - `mappedY = INPUT_WIDTH - x`
 - **SVG Scaling & Offsets**: Correctly calculating `scale` and `offsetX/Y` to account for the "cover" crop mode of the camera preview.
 - **Rotation-Aware Labels**: Applying SVG `transform` to labels to keep text readable in horizontal mode.
+- **Pro Orientation Mapping (V2)**: Integrated `expo-screen-orientation` to handle all 4 device orientations (Portrait, Portrait Down, Landscape Left, Landscape Right). This ensures that bboxes and text remain perfectly aligned even when the phone is flipped 180 degrees.
 
 ## Lessons Learned & Prevention
 - **Sensor vs. UI**: Mobile camera sensors are almost always landscape. The UI must handle the 90-degree rotation manually if the OS hasn't already rotated the image.
 - **Native Dependency Caution**: Avoid adding new native modules (`expo-screen-orientation`) mid-debugging if the user is using a standard Expo Go environment, as it triggers a "native module not found" crash.
-- **Device Differences**: Landscape Left vs. Landscape Right can invert coordinates; standardizing on a single orientation or using a "safe" transformation is more robust for cross-device support.
+- **Pro Mode Requirement**: Upgrading to `expo-screen-orientation` requires a native build or Development Client. The code now includes a `try-catch` safety net to prevent crashes on standard Expo Go while still supporting the pro feature.
+- **Device Differences**: Landscape Left vs. Landscape Right can invert coordinates; the pro mapping now explicitly handles both to prevent upside-down boxes.
 

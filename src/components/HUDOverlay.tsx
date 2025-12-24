@@ -1,25 +1,52 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, useWindowDimensions, Text } from 'react-native';
 import Svg, { Rect, Text as SvgText, G } from 'react-native-svg';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import { useVisionStore } from '../store/useVisionStore';
 
 export const HUDOverlay = () => {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const { detections, imageDimensions } = useVisionStore();
+  const [orientation, setOrientation] = useState<ScreenOrientation.Orientation>(
+    ScreenOrientation.Orientation.PORTRAIT_UP
+  );
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const initOrientation = async () => {
+      try {
+        const current = await ScreenOrientation.getOrientationAsync();
+        if (isMounted) setOrientation(current);
+      } catch (e) {
+        console.warn('ScreenOrientation module not found, falling back to aspect ratio logic.');
+      }
+    };
+
+    initOrientation();
+
+    const subscription = ScreenOrientation.addOrientationChangeListener((event) => {
+      if (isMounted) setOrientation(event.orientationInfo.orientation);
+    });
+
+    return () => {
+      isMounted = false;
+      ScreenOrientation.removeOrientationChangeListener(subscription);
+    };
+  }, []);
 
   const INPUT_WIDTH = imageDimensions.width;
   const INPUT_HEIGHT = imageDimensions.height;
 
-  // Detect if the sensor matches the UI orientation
-  const isUIInPortrait = screenHeight > screenWidth;
-  const isSensorInPortrait = INPUT_HEIGHT > INPUT_WIDTH;
+  // PRO LOGIC: Determine if we need to rotate based on actual hardware orientation
+  // Sensor is typically landscape (W > H)
+  const isPortraitMode = 
+    orientation === ScreenOrientation.Orientation.PORTRAIT_UP || 
+    orientation === ScreenOrientation.Orientation.PORTRAIT_DOWN;
 
-  // If UI is Portrait but Sensor is Landscape (or vice versa), we need to rotate
-  const needsRotation = isUIInPortrait !== isSensorInPortrait;
-
-  // Use effective dimensions for scaling
-  const effectiveWidth = needsRotation ? INPUT_HEIGHT : INPUT_WIDTH;
-  const effectiveHeight = needsRotation ? INPUT_WIDTH : INPUT_HEIGHT;
+  // Use effective dimensions for scaling calculations
+  const effectiveWidth = isPortraitMode ? INPUT_HEIGHT : INPUT_WIDTH;
+  const effectiveHeight = isPortraitMode ? INPUT_WIDTH : INPUT_HEIGHT;
 
   const screenAspectRatio = screenWidth / screenHeight;
   const imageAspectRatio = effectiveWidth / effectiveHeight;
@@ -72,18 +99,49 @@ export const HUDOverlay = () => {
           const [x, y, w, h] = detection.bbox;
           
           let rectX, rectY, rectW, rectH;
+          let textRotation = 0;
 
-          if (needsRotation) {
-            // PORTRAIT MODE (Sensor is sideways)
-            // Map Sensor Y to Screen X, Sensor X to Screen Y (inverted)
+          // PROFESSIONAL 4-WAY COORDINATE MAPPING
+          if (orientation === ScreenOrientation.Orientation.PORTRAIT_UP) {
+            // 90deg CCW
             const mappedX = y;
             const mappedY = INPUT_WIDTH - x;
             rectW = h * scale;
             rectH = w * scale;
             rectX = mappedX * scale - rectW / 2 - offsetX;
             rectY = mappedY * scale - rectH / 2 - offsetY;
-          } else {
-            // LANDSCAPE MODE (Sensor matches UI)
+            textRotation = 90;
+          } 
+          else if (orientation === ScreenOrientation.Orientation.PORTRAIT_DOWN) {
+            // 90deg CW
+            const mappedX = INPUT_HEIGHT - y;
+            const mappedY = x;
+            rectW = h * scale;
+            rectH = w * scale;
+            rectX = mappedX * scale - rectW / 2 - offsetX;
+            rectY = mappedY * scale - rectH / 2 - offsetY;
+            textRotation = -90;
+          }
+          else if (orientation === ScreenOrientation.Orientation.LANDSCAPE_RIGHT) {
+            // 0deg: Direct mapping
+            rectW = w * scale;
+            rectH = h * scale;
+            rectX = x * scale - rectW / 2 - offsetX;
+            rectY = y * scale - rectH / 2 - offsetY;
+            textRotation = 0;
+          }
+          else if (orientation === ScreenOrientation.Orientation.LANDSCAPE_LEFT) {
+            // 180deg: Mirror both axes
+            const mappedX = INPUT_WIDTH - x;
+            const mappedY = INPUT_HEIGHT - y;
+            rectW = w * scale;
+            rectH = h * scale;
+            rectX = mappedX * scale - rectW / 2 - offsetX;
+            rectY = mappedY * scale - rectH / 2 - offsetY;
+            textRotation = 180;
+          }
+          else {
+            // Fallback for unknown states
             rectW = w * scale;
             rectH = h * scale;
             rectX = x * scale - rectW / 2 - offsetX;
@@ -114,8 +172,7 @@ export const HUDOverlay = () => {
                 strokeWidth="0.3"
                 fontSize={isUrgent ? '14' : '12'}
                 fontWeight="bold"
-                // Rotate text 90deg only in Portrait mode where the sensor is rotated
-                transform={needsRotation ? `rotate(90, ${rectX}, ${rectY - 5})` : undefined}
+                transform={textRotation !== 0 ? `rotate(${textRotation}, ${rectX}, ${rectY - 5})` : undefined}
               >
                 {`${detection.label.toUpperCase()}${isUrgent ? ' !' : ''}`}
               </SvgText>
@@ -126,7 +183,7 @@ export const HUDOverlay = () => {
       
       <View style={styles.debugContainer}>
         <Text style={styles.debugText}>
-          Img: {INPUT_WIDTH}x{INPUT_HEIGHT} | Scr: {Math.round(screenWidth)}x{Math.round(screenHeight)} {needsRotation ? '(R)' : ''}
+          PRO MODE | Ori: {orientation} | Img: {INPUT_WIDTH}x{INPUT_HEIGHT}
         </Text>
       </View>
     </View>
