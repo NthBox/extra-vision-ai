@@ -38,15 +38,17 @@ export const HUDOverlay = () => {
   const INPUT_WIDTH = imageDimensions.width;
   const INPUT_HEIGHT = imageDimensions.height;
 
-  // PRO LOGIC: Determine if we need to rotate based on actual hardware orientation
-  // Sensor is typically landscape (W > H)
-  const isPortraitMode = 
-    orientation === ScreenOrientation.Orientation.PORTRAIT_UP || 
-    orientation === ScreenOrientation.Orientation.PORTRAIT_DOWN;
+  // Detect if the sensor matches the UI orientation
+  const isUIInPortrait = screenHeight > screenWidth;
+  const isSensorInPortrait = INPUT_HEIGHT > INPUT_WIDTH;
+
+  // If the sensor orientation doesn't match the UI, we need to transform
+  // This happens in Portrait mode (UI is vertical, Sensor is landscape)
+  const needsRotation = isUIInPortrait !== isSensorInPortrait;
 
   // Use effective dimensions for scaling calculations
-  const effectiveWidth = isPortraitMode ? INPUT_HEIGHT : INPUT_WIDTH;
-  const effectiveHeight = isPortraitMode ? INPUT_WIDTH : INPUT_HEIGHT;
+  const effectiveWidth = needsRotation ? INPUT_HEIGHT : INPUT_WIDTH;
+  const effectiveHeight = needsRotation ? INPUT_WIDTH : INPUT_HEIGHT;
 
   const screenAspectRatio = screenWidth / screenHeight;
   const imageAspectRatio = effectiveWidth / effectiveHeight;
@@ -101,51 +103,43 @@ export const HUDOverlay = () => {
           let rectX, rectY, rectW, rectH;
           let textRotation = 0;
 
-          // PROFESSIONAL 4-WAY COORDINATE MAPPING
-          if (orientation === ScreenOrientation.Orientation.PORTRAIT_UP) {
-            // 90deg CCW
+          // COORDINATE MAPPING
+          if (needsRotation) {
+            // Case: UI is Portrait, but Sensor is Landscape
+            // Apply 90deg CCW transform (standard for most mobile sensors)
             const mappedX = y;
             const mappedY = INPUT_WIDTH - x;
             rectW = h * scale;
             rectH = w * scale;
             rectX = mappedX * scale - rectW / 2 - offsetX;
             rectY = mappedY * scale - rectH / 2 - offsetY;
-            textRotation = 90;
+
+            // Handle text orientation for Portrait UI
+            if (orientation === ScreenOrientation.Orientation.PORTRAIT_UP) {
+              textRotation = 90;
+            } else if (orientation === ScreenOrientation.Orientation.PORTRAIT_DOWN) {
+              textRotation = -90;
+            }
           } 
-          else if (orientation === ScreenOrientation.Orientation.PORTRAIT_DOWN) {
-            // 90deg CW
-            const mappedX = INPUT_HEIGHT - y;
-            const mappedY = x;
-            rectW = h * scale;
-            rectH = w * scale;
-            rectX = mappedX * scale - rectW / 2 - offsetX;
-            rectY = mappedY * scale - rectH / 2 - offsetY;
-            textRotation = -90;
-          }
-          else if (orientation === ScreenOrientation.Orientation.LANDSCAPE_RIGHT) {
-            // 0deg: Direct mapping
-            rectW = w * scale;
-            rectH = h * scale;
-            rectX = x * scale - rectW / 2 - offsetX;
-            rectY = y * scale - rectH / 2 - offsetY;
-            textRotation = 0;
-          }
-          else if (orientation === ScreenOrientation.Orientation.LANDSCAPE_LEFT) {
-            // 180deg: Mirror both axes
-            const mappedX = INPUT_WIDTH - x;
-            const mappedY = INPUT_HEIGHT - y;
-            rectW = w * scale;
-            rectH = h * scale;
-            rectX = mappedX * scale - rectW / 2 - offsetX;
-            rectY = mappedY * scale - rectH / 2 - offsetY;
-            textRotation = 180;
-          }
           else {
-            // Fallback for unknown states
-            rectW = w * scale;
-            rectH = h * scale;
-            rectX = x * scale - rectW / 2 - offsetX;
-            rectY = y * scale - rectH / 2 - offsetY;
+            // Case: UI orientation matches Sensor (Landscape Left or Right)
+            if (orientation === ScreenOrientation.Orientation.LANDSCAPE_LEFT) {
+              // 180deg mirror mapping for inverted landscape
+              const mappedX = INPUT_WIDTH - x;
+              const mappedY = INPUT_HEIGHT - y;
+              rectW = w * scale;
+              rectH = h * scale;
+              rectX = mappedX * scale - rectW / 2 - offsetX;
+              rectY = mappedY * scale - rectH / 2 - offsetY;
+              textRotation = 180;
+            } else {
+              // Standard direct mapping for Landscape Right
+              rectW = w * scale;
+              rectH = h * scale;
+              rectX = x * scale - rectW / 2 - offsetX;
+              rectY = y * scale - rectH / 2 - offsetY;
+              textRotation = 0;
+            }
           }
 
           const color = getBoxColor(detection.label, rectX, rectY, rectW, rectH);

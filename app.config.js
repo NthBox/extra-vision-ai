@@ -5,7 +5,7 @@ export default ({ config }) => ({
   name: "Extra Vision AI",
   slug: "extra-vision-ai",
   version: "1.0.0",
-  orientation: "portrait",
+  orientation: "default",
   icon: "./assets/icon.png",
   userInterfaceStyle: "light",
   newArchEnabled: true,
