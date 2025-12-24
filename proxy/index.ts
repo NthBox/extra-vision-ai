@@ -39,14 +39,14 @@ export default {
         console.log("Initializing Streaming Session...");
         console.log("Workspace:", env.ROBOFLOW_WORKSPACE);
         console.log("Workflow ID:", env.ROBOFLOW_WORKFLOW_ID);
-        console.log("API Key Length:", env.ROBOFLOW_API_KEY?.length || 0);
-        console.log("API Key First 5 chars:", env.ROBOFLOW_API_KEY?.substring(0, 5) || "NONE");
+        
+        const incomingBody = await request.json() as any;
+        console.log("Incoming Body:", JSON.stringify(incomingBody));
         
         // Try multiple possible endpoints
         const endpoints = [
           `https://serverless.roboflow.com/webrtc/stream/init`,
           `https://detect.roboflow.com/webrtc/stream/init`,
-          `https://serverless.roboflow.com/stream/workflows/${env.ROBOFLOW_WORKSPACE}/${env.ROBOFLOW_WORKFLOW_ID}`,
         ];
 
         let lastError: any = null;
@@ -54,15 +54,13 @@ export default {
           try {
             console.log(`Trying endpoint: ${streamUrl}`);
             const requestBody = {
+              ...incomingBody,
               api_key: env.ROBOFLOW_API_KEY,
-              workflow_id: env.ROBOFLOW_WORKFLOW_ID,
-              workspace_id: env.ROBOFLOW_WORKSPACE,
-              config: {
-                requested_plan: "webrtc-gpu-large",
-                requested_region: "us",
-                realtime_processing: true
-              }
+              workflow_id: incomingBody.workflow_id || env.ROBOFLOW_WORKFLOW_ID,
+              workspace_id: incomingBody.workspace_id || env.ROBOFLOW_WORKSPACE,
             };
+            
+            console.log(`Requesting ${streamUrl} with body keys: ${Object.keys(requestBody).join(', ')}`);
             
             const response = await fetch(streamUrl, {
               method: "POST",

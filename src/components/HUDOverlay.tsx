@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, useWindowDimensions, Text } from 'react-native';
-import Svg, { Rect, Text as SvgText, G } from 'react-native-svg';
+import Svg, { Rect, Text as SvgText, G, Circle } from 'react-native-svg';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { useVisionStore } from '../store/useVisionStore';
 
 export const HUDOverlay = () => {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
-  const { detections, imageDimensions } = useVisionStore();
+  const { detections, imageDimensions, isStreaming } = useVisionStore();
   const [orientation, setOrientation] = useState<ScreenOrientation.Orientation>(
     ScreenOrientation.Orientation.PORTRAIT_UP
   );
@@ -86,6 +86,20 @@ export const HUDOverlay = () => {
   return (
     <View style={[StyleSheet.absoluteFill, { pointerEvents: 'none' }]}>
       <Svg height="100%" width="100%" viewBox={`0 0 ${screenWidth} ${screenHeight}`}>
+        {isStreaming && (
+          <G x={screenWidth - 80} y={50}>
+            <Circle cx="0" cy="0" r="6" fill="#FF3B30" />
+            <SvgText
+              x="12"
+              y="5"
+              fill="#FF3B30"
+              fontSize="14"
+              fontWeight="bold"
+            >
+              LIVE
+            </SvgText>
+          </G>
+        )}
         <Rect
           x={zoiX}
           y={zoiY}

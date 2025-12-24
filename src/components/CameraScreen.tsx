@@ -1,9 +1,11 @@
 import React, { useRef, useEffect, useCallback } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Dimensions } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, Dimensions, Switch } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { RTCView } from 'react-native-webrtc';
 import { useCameraStore } from '../store/useCameraStore';
 import { useVisionStore } from '../store/useVisionStore';
 import { useInference } from '../hooks/useInference';
+import { useRealTimeInference } from '../hooks/useRealTimeInference';
 import { HUDOverlay } from './HUDOverlay';
 
 export const CameraScreen = () => {
@@ -11,8 +13,17 @@ export const CameraScreen = () => {
   const cameraRef = useRef<CameraView>(null);
   
   const { isCameraReady, setIsCameraReady } = useCameraStore();
-  const { isInferring, detections, setImageDimensions } = useVisionStore();
+  const { 
+    isInferring, 
+    detections, 
+    setImageDimensions,
+    isRealTimeEnabled,
+    setRealTimeEnabled,
+    isStreaming
+  } = useVisionStore();
+  
   const { mutate: runInference } = useInference();
+  const { stream } = useRealTimeInference();
 
   useEffect(() => {
     if (!permission) {
@@ -21,13 +32,12 @@ export const CameraScreen = () => {
   }, [permission]);
 
   const captureFrame = useCallback(async () => {
-    if (cameraRef.current && isCameraReady && !isInferring) {
+    if (cameraRef.current && isCameraReady && !isInferring && !isRealTimeEnabled) {
       try {
         const photo = await cameraRef.current.takePictureAsync({
           base64: true,
-          quality: 0.3, // Lowered quality further to reduce buffer size
+          quality: 0.3,
           scale: 0.5,
-          // Removed skipProcessing: true as it can cause 'Image could not be captured' on some devices
         });
 
         if (photo?.base64) {
@@ -37,37 +47,31 @@ export const CameraScreen = () => {
           runInference(photo.base64);
         }
       } catch (error: any) {
-        // Handle common errors more gracefully
         const msg = error.message || '';
         if (msg.includes('Camera unmounted') || msg.includes('Image could not be captured')) {
-          // These are common during startup or if the loop is too fast, ignore for cleaner logs
           return;
         }
         console.error('Inference capture error:', error);
       }
     }
-  }, [isCameraReady, isInferring, runInference]);
+  }, [isCameraReady, isInferring, runInference, isRealTimeEnabled, setImageDimensions]);
 
-  // Inference Loop using sequential timeout to prevent overlap
+  // Inference Loop for manual mode
   useEffect(() => {
     let isMounted = true;
     let timeoutId: NodeJS.Timeout;
 
     const loop = async () => {
-      if (!isMounted) return;
+      if (!isMounted || isRealTimeEnabled) return;
       
-      // Add a small initial delay to ensure hardware is truly ready
       if (isCameraReady && !isInferring) {
         await captureFrame();
       }
       
-      // Dynamic delay: longer if it failed, shorter if it's working
-      // Target ~5-10 FPS to keep the camera buffer clear
       timeoutId = setTimeout(loop, 150); 
     };
 
-    if (isCameraReady) {
-      // Small delay after onCameraReady before starting the loop
+    if (isCameraReady && !isRealTimeEnabled) {
       timeoutId = setTimeout(loop, 500);
     }
 
@@ -75,7 +79,7 @@ export const CameraScreen = () => {
       isMounted = false;
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [isCameraReady, isInferring, captureFrame]);
+  }, [isCameraReady, isInferring, captureFrame, isRealTimeEnabled]);
 
   if (!permission) {
     return <View style={styles.container}><Text>Requesting permissions...</Text></View>;
@@ -94,18 +98,42 @@ export const CameraScreen = () => {
 
   return (
     <View style={styles.container}>
-      <CameraView
-        style={styles.camera}
-        ref={cameraRef}
-        onCameraReady={() => setIsCameraReady(true)}
-        responsiveOrientationWhenOrientationLocked
-      />
+      {isRealTimeEnabled && stream ? (
+        <RTCView
+          streamURL={stream.toURL()}
+          style={styles.camera}
+          objectFit="cover"
+        />
+      ) : (
+        <CameraView
+          style={styles.camera}
+          ref={cameraRef}
+          onCameraReady={() => setIsCameraReady(true)}
+          responsiveOrientationWhenOrientationLocked
+        />
+      )}
+      
       <HUDOverlay />
-      <View style={styles.overlay} pointerEvents="none">
-        <View style={styles.statusContainer}>
-          <Text style={styles.statusText}>
-            {isInferring ? 'Detecting...' : `Objects: ${detections.length}`}
-          </Text>
+      
+      <View style={styles.overlay}>
+        <View style={styles.controlsContainer}>
+          <View style={styles.toggleContainer}>
+            <Text style={styles.toggleLabel}>Real-time</Text>
+            <Switch
+              value={isRealTimeEnabled}
+              onValueChange={setRealTimeEnabled}
+              trackColor={{ false: "#767577", true: "#0a7ea4" }}
+              thumbColor={isRealTimeEnabled ? "#fff" : "#f4f3f4"}
+            />
+          </View>
+          
+          <View style={styles.statusContainer}>
+            <Text style={styles.statusText}>
+              {isRealTimeEnabled 
+                ? (isStreaming ? 'LIVE' : 'Connecting...') 
+                : (isInferring ? 'Detecting...' : `Objects: ${detections.length}`)}
+            </Text>
+          </View>
         </View>
       </View>
     </View>
@@ -127,6 +155,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingBottom: 40,
   },
+  controlsContainer: {
+    alignItems: 'center',
+    gap: 10,
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 25,
+    gap: 10,
+  },
+  toggleLabel: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
   message: {
     textAlign: 'center',
     paddingBottom: 10,
@@ -139,12 +185,13 @@ const styles = StyleSheet.create({
   },
   statusContainer: {
     backgroundColor: 'rgba(0,0,0,0.5)',
-    padding: 10,
-    borderRadius: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
   },
   statusText: {
     color: '#fff',
     fontSize: 14,
+    fontWeight: 'bold',
   },
 });
-

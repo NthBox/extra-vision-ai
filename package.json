@@ -9,6 +9,8 @@
     "web": "expo start --web"
   },
   "dependencies": {
+    "@config-plugins/react-native-webrtc": "^13.0.0",
+    "@roboflow/inference-sdk": "^0.1.9",
     "@tanstack/react-query": "^5.90.12",
     "expo": "~54.0.30",
     "expo-camera": "^17.0.10",
@@ -19,6 +21,7 @@
     "react": "19.1.0",
     "react-native": "0.81.5",
     "react-native-svg": "^15.15.1",
+    "react-native-webrtc": "^124.0.7",
     "zustand": "^5.0.9"
   },
   "devDependencies": {
