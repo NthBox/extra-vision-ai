@@ -9,7 +9,7 @@ The "Real-time" mode enables low-latency object detection by streaming the camer
 - **Roboflow Inference SDK**: Used to manage the WebRTC handshake and data channel.
 - **react-native-webrtc**: Provides the native WebRTC implementation for React Native, allowing access to `mediaDevices` and rendering via `RTCView`.
 - **@config-plugins/react-native-webrtc**: An Expo config plugin that automates the complex native setup (permissions, bitcode, background modes) required for WebRTC on iOS and Android.
-- **Cloudflare Worker Proxy**: Acts as a signaling server to securely inject the `ROBOFLOW_API_KEY` into the initialization request without exposing it on the client.
+- **Cloudflare Worker Proxy**: Acts as a signaling server to securely inject the `ROBOFLOW_API_KEY` into the initialization request. It implements `/v1/stream/init` for signaling and `/v1/webrtc-turn-config` for NAT traversal.
 
 ### 2. State Management (`src/store/useVisionStore.ts`)
 We added specific fields to track the streaming state:
@@ -20,7 +20,8 @@ We added specific fields to track the streaming state:
 ### 3. Core Hook (`src/hooks/useRealTimeInference.ts`)
 This hook encapsulates the WebRTC lifecycle:
 - **Initialization**: Requests camera permissions via `mediaDevices.getUserMedia`.
-- **Connection**: Uses `connectors.withProxyUrl` to point to our Cloudflare Worker.
+- **Global Registration**: Calls `registerGlobals()` to polyfill WebRTC constructors for the SDK.
+- **Connection**: Uses `connectors.withProxyUrl` with both signaling and TURN config endpoints.
 - **Data Handling**: Listen to the WebRTC data channel for `predictions`.
 - **Mapping**: Converts Roboflow's coordinate system to the app's internal `Detection` format.
 - **Cleanup**: Ensures tracks are stopped and the peer connection is closed on unmount or mode switch.

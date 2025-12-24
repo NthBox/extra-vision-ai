@@ -1,8 +1,11 @@
 import { useEffect, useCallback, useRef } from 'react';
-import { mediaDevices, MediaStream } from 'react-native-webrtc';
+import { mediaDevices, MediaStream, registerGlobals } from 'react-native-webrtc';
 import { webrtc, connectors } from '@roboflow/inference-sdk';
 import Constants from 'expo-constants';
 import { useVisionStore, Detection } from '../store/useVisionStore';
+
+// Polyfill WebRTC globals for the SDK
+registerGlobals();
 
 const INFERENCE_WORKER_URL = 
   Constants.expoConfig?.extra?.inferenceWorkerUrl || 'http://localhost:8787';
@@ -57,7 +60,9 @@ export const useRealTimeInference = () => {
       // Update image dimensions from stream if possible
       setImageDimensions(640, 480);
 
-      const connector = connectors.withProxyUrl(`${INFERENCE_WORKER_URL}/v1/stream/init`);
+      const connector = connectors.withProxyUrl(`${INFERENCE_WORKER_URL}/v1/stream/init`, {
+        turnConfigUrl: `${INFERENCE_WORKER_URL}/v1/webrtc-turn-config`
+      });
 
       const session = await webrtc.useStream({
         source: stream as any,
