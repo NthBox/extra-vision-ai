@@ -38,8 +38,8 @@ export const CameraScreen = () => {
       try {
         const photo = await cameraRef.current.takePictureAsync({
           base64: true,
-          quality: 0.3,
-          scale: 0.5,
+          quality: 0.2,
+          scale: 0.25,
         });
 
         if (photo?.base64) {
@@ -61,7 +61,7 @@ export const CameraScreen = () => {
   // Inference Loop for manual mode
   useEffect(() => {
     let isMounted = true;
-    let timeoutId: NodeJS.Timeout;
+    let timeoutId: any;
 
     const loop = async () => {
       if (!isMounted || isRealTimeEnabled || !isPlaying) return;
@@ -70,11 +70,13 @@ export const CameraScreen = () => {
         await captureFrame();
       }
       
-      timeoutId = setTimeout(loop, 150); 
+      // Aim for ~40ms cadence per frame (quarter of 150ms)
+      timeoutId = setTimeout(loop, 40); 
     };
 
     if (isCameraReady && !isRealTimeEnabled && isPlaying) {
-      timeoutId = setTimeout(loop, 500);
+      // Start immediately with a short delay to bootstrap cadence
+      timeoutId = setTimeout(loop, 40);
     }
 
     return () => {
