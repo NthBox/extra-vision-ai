@@ -11,7 +11,7 @@ export const CameraScreen = () => {
   const cameraRef = useRef<CameraView>(null);
   
   const { isCameraReady, setIsCameraReady } = useCameraStore();
-  const { isInferring, detections } = useVisionStore();
+  const { isInferring, detections, setImageDimensions } = useVisionStore();
   const { mutate: runInference } = useInference();
 
   useEffect(() => {
@@ -31,6 +31,9 @@ export const CameraScreen = () => {
         });
 
         if (photo?.base64) {
+          if (photo.width && photo.height) {
+            setImageDimensions(photo.width, photo.height);
+          }
           runInference(photo.base64);
         }
       } catch (error: any) {
