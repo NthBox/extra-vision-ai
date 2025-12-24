@@ -101,6 +101,7 @@ export const HUDOverlay = () => {
           const [x, y, w, h] = detection.bbox;
           
           let rectX, rectY, rectW, rectH;
+          let textRotation = 0;
 
           // COORDINATE MAPPING
           if (needsRotation) {
@@ -115,11 +116,22 @@ export const HUDOverlay = () => {
           } 
           else {
             // Case: UI orientation matches Sensor (Landscape Left or Right)
-            // OS handles the rotation, so we map 1:1
-            rectW = w * scale;
-            rectH = h * scale;
-            rectX = x * scale - rectW / 2 - offsetX;
-            rectY = y * scale - rectH / 2 - offsetY;
+            if (orientation === ScreenOrientation.Orientation.LANDSCAPE_LEFT) {
+              // Image 3 (Ori 3) is flipped horizontally and vertically
+              const mappedX = INPUT_WIDTH - x;
+              const mappedY = INPUT_HEIGHT - y;
+              rectW = w * scale;
+              rectH = h * scale;
+              rectX = mappedX * scale - rectW / 2 - offsetX;
+              rectY = mappedY * scale - rectH / 2 - offsetY;
+              textRotation = 180;
+            } else {
+              // Landscape Right (Ori 4) is usually direct 1:1 mapping
+              rectW = w * scale;
+              rectH = h * scale;
+              rectX = x * scale - rectW / 2 - offsetX;
+              rectY = y * scale - rectH / 2 - offsetY;
+            }
           }
 
           const color = getBoxColor(detection.label, rectX, rectY, rectW, rectH);
@@ -146,7 +158,7 @@ export const HUDOverlay = () => {
                 strokeWidth="0.3"
                 fontSize={isUrgent ? '14' : '12'}
                 fontWeight="bold"
-                // textRotation is removed because UI rotation handles it now
+                transform={textRotation !== 0 ? `rotate(${textRotation}, ${rectX}, ${rectY - 5})` : undefined}
               >
                 {`${detection.label.toUpperCase()}${isUrgent ? ' !' : ''}`}
               </SvgText>
