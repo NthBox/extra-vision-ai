@@ -113,25 +113,24 @@ export const HUDOverlay = () => {
             rectH = w * scale;
             rectX = mappedX * scale - rectW / 2 - offsetX;
             rectY = mappedY * scale - rectH / 2 - offsetY;
+
+            // In Portrait mode, the UI is vertical, so we might need to level the text
+            // depending on which way the phone is "up"
+            if (orientation === ScreenOrientation.Orientation.PORTRAIT_DOWN) {
+              textRotation = 180;
+            }
           } 
           else {
             // Case: UI orientation matches Sensor (Landscape Left or Right)
-            if (orientation === ScreenOrientation.Orientation.LANDSCAPE_LEFT) {
-              // Image 3 (Ori 3) is flipped horizontally and vertically
-              const mappedX = INPUT_WIDTH - x;
-              const mappedY = INPUT_HEIGHT - y;
-              rectW = w * scale;
-              rectH = h * scale;
-              rectX = mappedX * scale - rectW / 2 - offsetX;
-              rectY = mappedY * scale - rectH / 2 - offsetY;
-              textRotation = 180;
-            } else {
-              // Landscape Right (Ori 4) is usually direct 1:1 mapping
-              rectW = w * scale;
-              rectH = h * scale;
-              rectX = x * scale - rectW / 2 - offsetX;
-              rectY = y * scale - rectH / 2 - offsetY;
-            }
+            // OS handles the rotation of the SVG coordinate system and the camera buffer.
+            // We use direct 1:1 mapping.
+            rectW = w * scale;
+            rectH = h * scale;
+            rectX = x * scale - rectW / 2 - offsetX;
+            rectY = y * scale - rectH / 2 - offsetY;
+            
+            // Text should be upright in landscape natively
+            textRotation = 0;
           }
 
           const color = getBoxColor(detection.label, rectX, rectY, rectW, rectH);

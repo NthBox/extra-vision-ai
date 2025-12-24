@@ -22,7 +22,7 @@ Bounding boxes from Roboflow inference were "way off" and not lining up with the
     - `mappedY = INPUT_WIDTH - x`
 - **SVG Scaling & Offsets**: Correctly calculating `scale` and `offsetX/Y` to account for the "cover" crop mode of the camera preview.
 - **Rotation-Aware Labels**: Applying SVG `transform` to labels to keep text readable in horizontal mode.
-- **Pro Orientation Mapping (V3)**: Refined the hybrid mapping logic to account for unlocked app orientation. The logic now intelligently switches between 90-degree CCW transforms for Portrait mode and direct 1:1 mapping for Landscape modes. It specifically handles Landscape Left (inverted landscape) by applying a 180-degree coordinate mirror and text rotation to prevent boxes and labels from appearing upside-down.
+- **Pro Orientation Mapping (V4)**: Switched to a unified 1:1 mapping for all landscape orientations (Ori 3 & 4). Since the app orientation is unlocked, the OS handles the coordinate system rotation and the camera buffer orientation. Manual 180-degree flips were found to be redundant or incorrect when the OS is already managing the UI rotation. Text rotation is now only used in Portrait Down mode to handle inverted vertical use.
 
 ## Lessons Learned & Prevention
 - **Sensor vs. UI**: Mobile camera sensors are almost always landscape. The UI must handle the 90-degree rotation manually if the OS hasn't already rotated the image.
