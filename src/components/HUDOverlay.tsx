@@ -101,45 +101,25 @@ export const HUDOverlay = () => {
           const [x, y, w, h] = detection.bbox;
           
           let rectX, rectY, rectW, rectH;
-          let textRotation = 0;
 
           // COORDINATE MAPPING
           if (needsRotation) {
             // Case: UI is Portrait, but Sensor is Landscape
-            // Apply 90deg CCW transform (standard for most mobile sensors)
+            // Apply 90deg CCW transform to map sensor-space to portrait-screen-space
             const mappedX = y;
             const mappedY = INPUT_WIDTH - x;
             rectW = h * scale;
             rectH = w * scale;
             rectX = mappedX * scale - rectW / 2 - offsetX;
             rectY = mappedY * scale - rectH / 2 - offsetY;
-
-            // Handle text orientation for Portrait UI
-            if (orientation === ScreenOrientation.Orientation.PORTRAIT_UP) {
-              textRotation = 90;
-            } else if (orientation === ScreenOrientation.Orientation.PORTRAIT_DOWN) {
-              textRotation = -90;
-            }
           } 
           else {
             // Case: UI orientation matches Sensor (Landscape Left or Right)
-            if (orientation === ScreenOrientation.Orientation.LANDSCAPE_LEFT) {
-              // 180deg mirror mapping for inverted landscape
-              const mappedX = INPUT_WIDTH - x;
-              const mappedY = INPUT_HEIGHT - y;
-              rectW = w * scale;
-              rectH = h * scale;
-              rectX = mappedX * scale - rectW / 2 - offsetX;
-              rectY = mappedY * scale - rectH / 2 - offsetY;
-              textRotation = 180;
-            } else {
-              // Standard direct mapping for Landscape Right
-              rectW = w * scale;
-              rectH = h * scale;
-              rectX = x * scale - rectW / 2 - offsetX;
-              rectY = y * scale - rectH / 2 - offsetY;
-              textRotation = 0;
-            }
+            // OS handles the rotation, so we map 1:1
+            rectW = w * scale;
+            rectH = h * scale;
+            rectX = x * scale - rectW / 2 - offsetX;
+            rectY = y * scale - rectH / 2 - offsetY;
           }
 
           const color = getBoxColor(detection.label, rectX, rectY, rectW, rectH);
@@ -166,7 +146,7 @@ export const HUDOverlay = () => {
                 strokeWidth="0.3"
                 fontSize={isUrgent ? '14' : '12'}
                 fontWeight="bold"
-                transform={textRotation !== 0 ? `rotate(${textRotation}, ${rectX}, ${rectY - 5})` : undefined}
+                // textRotation is removed because UI rotation handles it now
               >
                 {`${detection.label.toUpperCase()}${isUrgent ? ' !' : ''}`}
               </SvgText>
