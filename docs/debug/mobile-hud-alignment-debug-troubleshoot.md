@@ -14,20 +14,20 @@ Bounding boxes from Roboflow inference were "way off" and not lining up with the
 3. **Rotation-Aware Mapping**: Implemented a 90-degree coordinate transformation (X->Y, Y->X) when aspect ratios mismatched. (Success for Portrait).
 4. **4-Way Orientation**: Attempted `expo-screen-orientation` for precise Landscape Left/Right detection. (Failed: Required native rebuild/Development Client).
 5. **Aspect-Ratio Fallback**: Reverted to `useWindowDimensions` with improved "needsRotation" detection logic.
+6. **Unified Hybrid Logic (Final)**: Unlocked app orientation in `app.config.js`. This allowed the OS to handle coordinate rotation natively. Switched to 1:1 mapping for all Landscape modes and 90-deg CCW for Portrait.
 
 ## Approaches That Worked
+- **Unlocked App Orientation**: Changing `app.config.js` to `orientation: "default"` allowed the OS to handle coordinate system shifts correctly.
 - **Dynamic Dimension Capture**: Updating the store with the exact width/height of every captured photo.
-- **Coordinate Transformation**: 
-    - `mappedX = y`
-    - `mappedY = INPUT_WIDTH - x`
+- **Hybrid Mapping Logic (V4 - Final Solution)**: 
+    - **Portrait**: 90-degree CCW transformation (`mappedX = y`, `mappedY = INPUT_WIDTH - x`).
+    - **Landscape**: Direct 1:1 mapping for both Left and Right orientations, relying on native OS rotation.
 - **SVG Scaling & Offsets**: Correctly calculating `scale` and `offsetX/Y` to account for the "cover" crop mode of the camera preview.
-- **Rotation-Aware Labels**: Applying SVG `transform` to labels to keep text readable in horizontal mode.
-- **Pro Orientation Mapping (V4)**: Switched to a unified 1:1 mapping for all landscape orientations (Ori 3 & 4). Since the app orientation is unlocked, the OS handles the coordinate system rotation and the camera buffer orientation. Manual 180-degree flips were found to be redundant or incorrect when the OS is already managing the UI rotation. Text rotation is now only used in Portrait Down mode to handle inverted vertical use.
+- **Native Readability**: Removing forced SVG text rotations in Landscape mode and allowing the native UI rotation to level the labels.
 
 ## Lessons Learned & Prevention
-- **Sensor vs. UI**: Mobile camera sensors are almost always landscape. The UI must handle the 90-degree rotation manually if the OS hasn't already rotated the image.
-- **Native Dependency Caution**: Avoid adding new native modules (`expo-screen-orientation`) mid-debugging if the user is using a standard Expo Go environment, as it triggers a "native module not found" crash.
-- **Pro Mode Requirement**: Upgrading to `expo-screen-orientation` requires a native build or Development Client. The code now includes a `try-catch` safety net to prevent crashes on standard Expo Go while still supporting the pro feature.
-- **Device Differences**: Landscape Left vs. Landscape Right can invert coordinates; the pro mapping now explicitly handles both to prevent upside-down boxes.
-- **Reference Error Prevention**: Always initialize variables used in SVG transforms (like `textRotation`) outside of conditional blocks to avoid `ReferenceError`.
-
+- **Leverage Native OS Rotation**: Don't try to manually rotate coordinates if you can unlock the app orientation and let the OS handle it. Manual rotations often fight against built-in sensor-to-UI transforms.
+- **Sensor vs. UI**: Mobile camera sensors are almost always landscape. The UI must handle the 90-degree rotation manually *only* in Portrait mode.
+- **Native Dependency Caution**: Avoid adding new native modules (`expo-screen-orientation`) mid-debugging if the user is using a standard Expo Go environment. Rebuilding the development client is necessary after adding `expo-screen-orientation`.
+- **Reference Error Prevention**: Always initialize variables used in SVG transforms (like `textRotation`) outside of conditional blocks.
+- **Pro Mode Stability**: Adding a `try-catch` wrapper around `ScreenOrientation` calls allows the app to run on standard Expo Go while still providing pro features on Development Clients.
