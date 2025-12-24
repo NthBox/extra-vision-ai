@@ -28,6 +28,9 @@ export const useInference = () => {
       setInferring(true);
     },
     onSuccess: (data) => {
+      if (data.length > 0) {
+        console.log(`Detections: ${data.map(d => d.label).join(', ')}`);
+      }
       setDetections(data);
       updateInferenceTime();
     },
