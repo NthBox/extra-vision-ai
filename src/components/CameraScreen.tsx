@@ -19,7 +19,9 @@ export const CameraScreen = () => {
     setImageDimensions,
     isRealTimeEnabled,
     setRealTimeEnabled,
-    isStreaming
+    isStreaming,
+    isPlaying,
+    setIsPlaying
   } = useVisionStore();
   
   const { mutate: runInference } = useInference();
@@ -32,7 +34,7 @@ export const CameraScreen = () => {
   }, [permission]);
 
   const captureFrame = useCallback(async () => {
-    if (cameraRef.current && isCameraReady && !isInferring && !isRealTimeEnabled) {
+    if (cameraRef.current && isCameraReady && !isInferring && !isRealTimeEnabled && isPlaying) {
       try {
         const photo = await cameraRef.current.takePictureAsync({
           base64: true,
@@ -54,7 +56,7 @@ export const CameraScreen = () => {
         console.error('Inference capture error:', error);
       }
     }
-  }, [isCameraReady, isInferring, runInference, isRealTimeEnabled, setImageDimensions]);
+  }, [isCameraReady, isInferring, runInference, isRealTimeEnabled, isPlaying, setImageDimensions]);
 
   // Inference Loop for manual mode
   useEffect(() => {
@@ -62,7 +64,7 @@ export const CameraScreen = () => {
     let timeoutId: NodeJS.Timeout;
 
     const loop = async () => {
-      if (!isMounted || isRealTimeEnabled) return;
+      if (!isMounted || isRealTimeEnabled || !isPlaying) return;
       
       if (isCameraReady && !isInferring) {
         await captureFrame();
@@ -71,7 +73,7 @@ export const CameraScreen = () => {
       timeoutId = setTimeout(loop, 150); 
     };
 
-    if (isCameraReady && !isRealTimeEnabled) {
+    if (isCameraReady && !isRealTimeEnabled && isPlaying) {
       timeoutId = setTimeout(loop, 500);
     }
 
@@ -79,7 +81,7 @@ export const CameraScreen = () => {
       isMounted = false;
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [isCameraReady, isInferring, captureFrame, isRealTimeEnabled]);
+  }, [isCameraReady, isInferring, captureFrame, isRealTimeEnabled, isPlaying]);
 
   if (!permission) {
     return <View style={styles.container}><Text>Requesting permissions...</Text></View>;
@@ -117,21 +119,32 @@ export const CameraScreen = () => {
       
       <View style={styles.overlay}>
         <View style={styles.controlsContainer}>
-          <View style={styles.toggleContainer}>
-            <Text style={styles.toggleLabel}>Real-time</Text>
-            <Switch
-              value={isRealTimeEnabled}
-              onValueChange={setRealTimeEnabled}
-              trackColor={{ false: "#767577", true: "#0a7ea4" }}
-              thumbColor={isRealTimeEnabled ? "#fff" : "#f4f3f4"}
-            />
+          <View style={styles.topControls}>
+            <View style={styles.toggleContainer}>
+              <Text style={styles.toggleLabel}>Real-time</Text>
+              <Switch
+                value={isRealTimeEnabled}
+                onValueChange={setRealTimeEnabled}
+                trackColor={{ false: "#767577", true: "#0a7ea4" }}
+                thumbColor={isRealTimeEnabled ? "#fff" : "#f4f3f4"}
+              />
+            </View>
+
+            <TouchableOpacity 
+              style={[styles.playButton, isPlaying ? styles.pauseButton : styles.startButton]} 
+              onPress={() => setIsPlaying(!isPlaying)}
+            >
+              <Text style={styles.playButtonText}>{isPlaying ? 'PAUSE' : 'PLAY'}</Text>
+            </TouchableOpacity>
           </View>
           
           <View style={styles.statusContainer}>
             <Text style={styles.statusText}>
-              {isRealTimeEnabled 
-                ? (isStreaming ? 'LIVE' : 'Connecting...') 
-                : (isInferring ? 'Detecting...' : `Objects: ${detections.length}`)}
+              {!isPlaying 
+                ? 'PAUSED'
+                : (isRealTimeEnabled 
+                  ? (isStreaming ? `LIVE | Objects: ${detections.length}` : 'Connecting...') 
+                  : (isInferring ? 'Detecting...' : `Objects: ${detections.length}`))}
             </Text>
           </View>
         </View>
@@ -159,6 +172,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
+  topControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   toggleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -167,6 +185,25 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 25,
     gap: 10,
+  },
+  playButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 25,
+    minWidth: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  startButton: {
+    backgroundColor: '#4CAF50',
+  },
+  pauseButton: {
+    backgroundColor: '#f44336',
+  },
+  playButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
   toggleLabel: {
     color: '#fff',

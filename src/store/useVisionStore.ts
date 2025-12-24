@@ -15,6 +15,7 @@ interface VisionState {
   isRealTimeEnabled: boolean;
   isStreaming: boolean;
   streamingError: string | null;
+  isPlaying: boolean;
   
   setDetections: (detections: Detection[]) => void;
   setInferring: (isInferring: boolean) => void;
@@ -24,6 +25,7 @@ interface VisionState {
   setRealTimeEnabled: (enabled: boolean) => void;
   setStreaming: (isStreaming: boolean) => void;
   setStreamingError: (error: string | null) => void;
+  setIsPlaying: (isPlaying: boolean) => void;
 }
 
 export const useVisionStore = create<VisionState>((set) => ({
@@ -34,6 +36,7 @@ export const useVisionStore = create<VisionState>((set) => ({
   isRealTimeEnabled: false,
   isStreaming: false,
   streamingError: null,
+  isPlaying: false,
 
   setDetections: (detections) => set({ detections }),
   setInferring: (isInferring) => set({ isInferring }),
@@ -42,4 +45,5 @@ export const useVisionStore = create<VisionState>((set) => ({
   setRealTimeEnabled: (enabled) => set({ isRealTimeEnabled: enabled }),
   setStreaming: (isStreaming) => set({ isStreaming }),
   setStreamingError: (error) => set({ streamingError: error }),
+  setIsPlaying: (isPlaying) => set({ isPlaying }),
 }));

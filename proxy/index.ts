@@ -8,7 +8,6 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const pathname = url.pathname;
-    console.log(`[DEBUG] Request: ${request.method} ${pathname}`);
 
     // 1. Handle CORS pre-flight requests
     if (request.method === "OPTIONS") {
@@ -27,17 +26,52 @@ export default {
       try {
         const roboflowUrl = `https://api.roboflow.com/webrtc_turn_config?api_key=${env.ROBOFLOW_API_KEY}`;
         const response = await fetch(roboflowUrl);
-        const data = await response.json();
-        return new Response(JSON.stringify(data), {
+        
+        let iceServers: any[] = [];
+        
+        if (response.ok) {
+          const data = await response.json() as any;
+          
+          // Handle different response formats from Roboflow
+          if (Array.isArray(data)) {
+            iceServers = data;
+          } else if (data.iceServers && Array.isArray(data.iceServers)) {
+            iceServers = data.iceServers;
+          } else if (data.urls) {
+            iceServers = [data];
+          }
+        }
+        
+        // Always include default STUN servers as fallback
+        const defaultStun = [
+          { urls: ["stun:stun.l.google.com:19302"] },
+          { urls: ["stun:stun1.l.google.com:19302"] }
+        ];
+        
+        // Combine TURN servers (if any) with STUN fallbacks
+        const allServers = iceServers.length > 0 
+          ? [...iceServers, ...defaultStun]
+          : defaultStun;
+        
+        return new Response(JSON.stringify({ iceServers: allServers }), {
           headers: { 
             "Content-Type": "application/json",
             "Access-Control-Allow-Origin": "*" 
           },
         });
       } catch (error: any) {
-        return new Response(JSON.stringify({ error: error.message }), { 
-          status: 500,
-          headers: { "Access-Control-Allow-Origin": "*" }
+        // Return default STUN servers on error
+        return new Response(JSON.stringify({ 
+          iceServers: [
+            { urls: ["stun:stun.l.google.com:19302"] },
+            { urls: ["stun:stun1.l.google.com:19302"] }
+          ]
+        }), {
+          status: 200,
+          headers: { 
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*" 
+          },
         });
       }
     }
@@ -53,9 +87,16 @@ export default {
 
       try {
         const { offer, wrtcParams } = await request.json() as any;
-        console.log("Initializing Streaming Session for Workflow:", wrtcParams.workflowId || env.ROBOFLOW_WORKFLOW_ID);
         
-        // Reconstruct the request body as expected by Roboflow /initialise_webrtc_worker
+        // Ensure we have valid workspace and workflow IDs
+        const workspace = (wrtcParams.workspaceName && wrtcParams.workspaceName !== 'n-a') 
+          ? wrtcParams.workspaceName 
+          : env.ROBOFLOW_WORKSPACE;
+          
+        const workflowId = (wrtcParams.workflowId && wrtcParams.workflowId !== 'n-a')
+          ? wrtcParams.workflowId
+          : env.ROBOFLOW_WORKFLOW_ID;
+
         const workflowConfig: any = {
           type: "WorkflowConfiguration",
           image_input_name: wrtcParams.imageInputName || "image",
@@ -63,11 +104,11 @@ export default {
           workflows_thread_pool_workers: wrtcParams.threadPoolWorkers || 4,
           cancel_thread_pool_tasks_on_exit: true,
           video_metadata_input_name: "video_metadata",
-          workspace_name: wrtcParams.workspaceName || env.ROBOFLOW_WORKSPACE,
-          workflow_id: wrtcParams.workflowId || env.ROBOFLOW_WORKFLOW_ID
+          workspace_name: workspace,
+          workflow_id: workflowId
         };
 
-        const roboflowRequestBody = {
+        const roboflowRequestBody: any = {
           workflow_configuration: workflowConfig,
           api_key: env.ROBOFLOW_API_KEY,
           webrtc_realtime_processing: wrtcParams.realtimeProcessing !== false,
@@ -77,30 +118,59 @@ export default {
           },
           webrtc_config: wrtcParams.iceServers ? { iceServers: wrtcParams.iceServers } : null,
           stream_output: wrtcParams.streamOutputNames || [],
-          data_output: wrtcParams.dataOutputNames || ["predictions"]
         };
-
-        const roboflowUrl = `https://serverless.roboflow.com/initialise_webrtc_worker`;
-        console.log(`Calling Roboflow: ${roboflowUrl}`);
         
-        const response = await fetch(roboflowUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(roboflowRequestBody),
+        // Include data_output if explicitly specified
+        // Ensure it's always an array when provided
+        if (wrtcParams.dataOutputNames !== undefined) {
+          roboflowRequestBody.data_output = Array.isArray(wrtcParams.dataOutputNames) 
+            ? wrtcParams.dataOutputNames 
+            : [wrtcParams.dataOutputNames];
+        }
+        
+        // Log request for debugging (without sensitive data)
+        console.log('[Proxy] WebRTC Init Request:', {
+          workspace: workspace,
+          workflowId: workflowId,
+          hasDataOutput: !!roboflowRequestBody.data_output,
+          dataOutput: roboflowRequestBody.data_output,
+          streamOutput: roboflowRequestBody.stream_output
         });
 
-        const data = await response.json() as any;
-        console.log(`Roboflow Response Status: ${response.status}`);
+        const endpoints = [
+          `https://detect.roboflow.com/initialise_webrtc_worker`,
+          `https://serverless.roboflow.com/initialise_webrtc_worker`,
+        ];
+
+        let lastErrorResponse: any = null;
+        for (const roboflowUrl of endpoints) {
+          const response = await fetch(roboflowUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(roboflowRequestBody),
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            return new Response(JSON.stringify(data), {
+              status: response.status,
+              headers: { 
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*" 
+              },
+            });
+          }
+          lastErrorResponse = { status: response.status, body: await response.text() };
+        }
         
-        return new Response(JSON.stringify(data), {
-          status: response.status,
-          headers: { 
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*" 
-          },
+        // Log error if initialization failed on all endpoints
+        console.error(`WebRTC Init Failed. Last status: ${lastErrorResponse.status}, body: ${lastErrorResponse.body}`);
+        
+        return new Response(lastErrorResponse.body, {
+          status: lastErrorResponse.status,
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
         });
       } catch (error: any) {
-        console.error("Proxy Error:", error.message);
         return new Response(JSON.stringify({ error: error.message }), { 
           status: 500,
           headers: { "Access-Control-Allow-Origin": "*" }
@@ -137,8 +207,14 @@ export default {
         const output0 = rawData.outputs?.[0] || {};
         const predictions = output0.predictions?.predictions || output0.output?.predictions || output0.predictions || [];
         
+        // Convert center coordinates to top-left bbox format [x, y, w, h]
         const minifiedPredictions = predictions.map((p: any) => ({
-          bbox: [p.x, p.y, p.width, p.height],
+          bbox: [
+            p.x - p.width / 2,   // top-left x
+            p.y - p.height / 2,  // top-left y
+            p.width,
+            p.height
+          ],
           label: p.class || p.label,
           score: p.confidence || p.score,
         }));
