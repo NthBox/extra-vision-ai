@@ -4,13 +4,14 @@ export default ({ config }) => ({
   ...config,
   name: "Extra Vision AI",
   slug: "extra-vision-ai",
- version: "1.0.1",
+  version: "1.0.1",
   orientation: "default",
   icon: "./assets/icon.png",
   userInterfaceStyle: "light",
   newArchEnabled: true,
   plugins: [
-    "@config-plugins/react-native-webrtc"
+    "@config-plugins/react-native-webrtc",
+    "expo-asset"
   ],
   splash: {
     image: "./assets/splash-icon.png",

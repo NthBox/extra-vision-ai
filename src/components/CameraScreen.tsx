@@ -7,6 +7,7 @@ import { useVisionStore } from '../store/useVisionStore';
 import { useInference } from '../hooks/useInference';
 import { useRealTimeInference } from '../hooks/useRealTimeInference';
 import { HUDOverlay } from './HUDOverlay';
+import { ThreeViewContainer } from './ThreeView';
 
 export const CameraScreen = () => {
   const [permission, requestPermission] = useCameraPermissions();
@@ -21,7 +22,9 @@ export const CameraScreen = () => {
     setRealTimeEnabled,
     isStreaming,
     isPlaying,
-    setIsPlaying
+    setIsPlaying,
+    visualizationMode,
+    setVisualizationMode
   } = useVisionStore();
   
   const { mutate: runInference } = useInference();
@@ -102,25 +105,48 @@ export const CameraScreen = () => {
 
   return (
     <View style={styles.container}>
-      {isRealTimeEnabled && stream ? (
-        <RTCView
-          streamURL={stream.toURL()}
-          style={styles.camera}
-          objectFit="cover"
-        />
-      ) : (
-        <CameraView
-          style={styles.camera}
-          ref={cameraRef}
-          onCameraReady={() => setIsCameraReady(true)}
-          responsiveOrientationWhenOrientationLocked
-        />
+      <View style={styles.cameraContainer}>
+        {isRealTimeEnabled && stream ? (
+          <RTCView
+            streamURL={stream.toURL()}
+            style={styles.camera}
+            objectFit="cover"
+          />
+        ) : (
+          <CameraView
+            style={styles.camera}
+            ref={cameraRef}
+            onCameraReady={() => setIsCameraReady(true)}
+            responsiveOrientationWhenOrientationLocked
+          />
+        )}
+      </View>
+
+      {visualizationMode === '3D' && (
+        <View style={styles.threeOverlay}>
+          <ThreeViewContainer />
+        </View>
       )}
       
       <HUDOverlay />
       
       <View style={styles.overlay}>
         <View style={styles.controlsContainer}>
+          <View style={styles.modeToggleContainer}>
+            <View style={[styles.toggleContainer, { backgroundColor: 'rgba(255,152,0,0.3)' }]}>
+              <Text style={[styles.toggleLabel, { color: '#ff9800' }]}>3D View</Text>
+              <Switch
+                value={visualizationMode === '3D'}
+                onValueChange={(val) => {
+                  console.log('Changing visualization mode to:', val ? '3D' : 'CAMERA');
+                  setVisualizationMode(val ? '3D' : 'CAMERA');
+                }}
+                trackColor={{ false: "#767577", true: "#ff9800" }}
+                thumbColor={visualizationMode === '3D' ? "#fff" : "#f4f3f4"}
+              />
+            </View>
+          </View>
+
           <View style={styles.topControls}>
             <View style={styles.toggleContainer}>
               <Text style={styles.toggleLabel}>Real-time</Text>
@@ -160,6 +186,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000',
   },
+  cameraContainer: {
+    flex: 1,
+  },
+  threeOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 5,
+  },
   camera: {
     flex: 1,
   },
@@ -169,6 +202,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     alignItems: 'center',
     paddingBottom: 40,
+    zIndex: 10,
   },
   controlsContainer: {
     alignItems: 'center',
@@ -178,6 +212,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+  },
+  modeToggleContainer: {
+    marginBottom: 5,
   },
   toggleContainer: {
     flexDirection: 'row',

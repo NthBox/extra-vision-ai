@@ -6,7 +6,7 @@ import { useVisionStore } from '../store/useVisionStore';
 
 export const HUDOverlay = () => {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
-  const { detections, imageDimensions, isStreaming } = useVisionStore();
+  const { detections, imageDimensions, isStreaming, visualizationMode } = useVisionStore();
   const [orientation, setOrientation] = useState<ScreenOrientation.Orientation>(
     ScreenOrientation.Orientation.PORTRAIT_UP
   );
@@ -111,7 +111,7 @@ export const HUDOverlay = () => {
           fill="transparent"
         />
 
-        {detections.map((detection, index) => {
+        {visualizationMode !== '3D' && detections.map((detection, index) => {
           const [x, y, w, h] = detection.bbox;
           
           let rectX, rectY, rectW, rectH;

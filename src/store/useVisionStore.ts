@@ -16,6 +16,7 @@ interface VisionState {
   isStreaming: boolean;
   streamingError: string | null;
   isPlaying: boolean;
+  visualizationMode: 'CAMERA' | '3D';
   
   setDetections: (detections: Detection[]) => void;
   setInferring: (isInferring: boolean) => void;
@@ -26,6 +27,7 @@ interface VisionState {
   setStreaming: (isStreaming: boolean) => void;
   setStreamingError: (error: string | null) => void;
   setIsPlaying: (isPlaying: boolean) => void;
+  setVisualizationMode: (mode: 'CAMERA' | '3D') => void;
 }
 
 export const useVisionStore = create<VisionState>((set) => ({
@@ -37,6 +39,7 @@ export const useVisionStore = create<VisionState>((set) => ({
   isStreaming: false,
   streamingError: null,
   isPlaying: false,
+  visualizationMode: 'CAMERA',
 
   setDetections: (detections) => set({ detections }),
   setInferring: (isInferring) => set({ isInferring }),
@@ -46,4 +49,5 @@ export const useVisionStore = create<VisionState>((set) => ({
   setStreaming: (isStreaming) => set({ isStreaming }),
   setStreamingError: (error) => set({ streamingError: error }),
   setIsPlaying: (isPlaying) => set({ isPlaying }),
+  setVisualizationMode: (visualizationMode) => set({ visualizationMode }),
 }));
