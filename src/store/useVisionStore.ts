@@ -22,21 +22,21 @@ const CAMERA_PRESETS: Record<CameraPreset, CameraConfig> = {
     height: 1.2,
     pitch: -0.05, // ~3 degrees down
     opticalCenter: [0.5, 0.5],
-    horizontalOffset: 0,
+    horizontalOffset: 0.05,
   },
   ULTRA_WIDE: {
     fov: 120,
     height: 1.2,
     pitch: -0.05,
     opticalCenter: [0.5, 0.5],
-    horizontalOffset: 0,
+    horizontalOffset: 0.05,
   },
   TELE: {
     fov: 30,
     height: 1.2,
     pitch: -0.02,
     opticalCenter: [0.5, 0.5],
-    horizontalOffset: 0,
+    horizontalOffset: 0.05,
   }
 };
 
@@ -52,7 +52,6 @@ interface VisionState {
   isPlaying: boolean;
   visualizationMode: 'CAMERA' | '3D';
   threeViewMode: 'REAL' | 'SIMULATED';
-  simulatedViewZoom: 'NORMAL' | 'ZOOMED';
   
   // Camera Model fields
   cameraConfig: CameraConfig;
@@ -68,7 +67,6 @@ interface VisionState {
   setIsPlaying: (isPlaying: boolean) => void;
   setVisualizationMode: (mode: 'CAMERA' | '3D') => void;
   setThreeViewMode: (mode: 'REAL' | 'SIMULATED') => void;
-  setSimulatedViewZoom: (zoom: 'NORMAL' | 'ZOOMED') => void;
   
   // Camera Model setters
   updateCameraConfig: (config: Partial<CameraConfig>) => void;
@@ -86,7 +84,6 @@ export const useVisionStore = create<VisionState>((set) => ({
   isPlaying: false,
   visualizationMode: 'CAMERA',
   threeViewMode: 'SIMULATED',
-  simulatedViewZoom: 'NORMAL',
   cameraConfig: CAMERA_PRESETS.WIDE,
 
   setDetections: (detections) => set({ detections }),
@@ -99,7 +96,6 @@ export const useVisionStore = create<VisionState>((set) => ({
   setIsPlaying: (isPlaying) => set({ isPlaying }),
   setVisualizationMode: (visualizationMode) => set({ visualizationMode }),
   setThreeViewMode: (threeViewMode) => set({ threeViewMode }),
-  setSimulatedViewZoom: (simulatedViewZoom) => set({ simulatedViewZoom }),
   
   updateCameraConfig: (config) => set((state) => ({ 
     cameraConfig: { ...state.cameraConfig, ...config } 

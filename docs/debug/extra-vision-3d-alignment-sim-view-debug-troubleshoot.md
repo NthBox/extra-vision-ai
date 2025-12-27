@@ -25,6 +25,7 @@
 - **Low-Profile Chase Cam**: Moving the 3D camera lower and steeper anchored the Ego car at the bottom edge, maximizing road visibility.
 - **Compact UIUX**: Consolidating 3D/SIM/REAL toggles into a single bottom row significantly improved the testing workflow.
 - **Center Calibration**: Allowing for a `horizontalOffset` in the projection math successfully aligned the lead vehicle with the Ego path.
+- **Default Offset**: Set default `horizontalOffset` to `0.05` based on real-world mounting feedback to ensure centered lead vehicle alignment out of the box.
 
 ## Prevention for Future Implementation
 - **Always stick to one coordinate standard** (Top-Left) for bounding boxes from the start of the data pipeline.
