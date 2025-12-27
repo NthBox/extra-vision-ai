@@ -21,11 +21,11 @@
 - **Horizontal Calibration**: Added `L` (Left) and `R` (Right) nudge controls to calibrate the optical center offset dynamically.
 
 ## Approaches That Worked
-- **Power-Curve Depth**: Using a quadratic/power curve (`Math.pow(1-t, 2.5)`) for simulated depth successfully pulled middle-ground objects closer, matching human intuition.
-- **Low-Profile Chase Cam**: Moving the 3D camera lower and steeper anchored the Ego car at the bottom edge, maximizing road visibility.
-- **Compact UIUX**: Consolidating 3D/SIM/REAL toggles into a single bottom row significantly improved the testing workflow.
+- **Power-Curve Depth**: Using a steep quadratic/power curve (`Math.pow(1-t, 2.5)`) for simulated depth successfully pulled middle-ground objects closer, significantly improving spatial awareness and utility.
+- **Horizon & FOV Anchoring**: Setting the horizon to `0.35` and FOV to `65-70` degrees created a more intimate and accurate "driver's eye" simulation.
+- **Low-Profile Chase Cam**: Moving the 3D camera lower (`Y=8`) and closer (`Z=12`) anchored the Ego car at the bottom edge, maximizing road visibility.
+- **Compact UIUX**: Consolidating 3D/SIM/REAL toggles and Calibration Nudges into a single bottom row following modern mobile design patterns.
 - **Center Calibration**: Allowing for a `horizontalOffset` in the projection math successfully aligned the lead vehicle with the Ego path.
-- **Default Offset**: Set default `horizontalOffset` to `0.05` based on real-world mounting feedback to ensure centered lead vehicle alignment out of the box.
 
 ## Prevention for Future Implementation
 - **Always stick to one coordinate standard** (Top-Left) for bounding boxes from the start of the data pipeline.

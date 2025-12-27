@@ -22,21 +22,21 @@ const CAMERA_PRESETS: Record<CameraPreset, CameraConfig> = {
     height: 1.2,
     pitch: -0.05, // ~3 degrees down
     opticalCenter: [0.5, 0.5],
-    horizontalOffset: 0.05,
+    horizontalOffset: 0,
   },
   ULTRA_WIDE: {
     fov: 120,
     height: 1.2,
     pitch: -0.05,
     opticalCenter: [0.5, 0.5],
-    horizontalOffset: 0.05,
+    horizontalOffset: 0,
   },
   TELE: {
     fov: 30,
     height: 1.2,
     pitch: -0.02,
     opticalCenter: [0.5, 0.5],
-    horizontalOffset: 0.05,
+    horizontalOffset: 0,
   }
 };
 
