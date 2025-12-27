@@ -45,7 +45,9 @@ export default {
         // Always include default STUN servers as fallback
         const defaultStun = [
           { urls: ["stun:stun.l.google.com:19302"] },
-          { urls: ["stun:stun1.l.google.com:19302"] }
+          { urls: ["stun:stun1.l.google.com:19302"] },
+          { urls: ["stun:stun2.l.google.com:19302"] },
+          { urls: ["stun:stun.cloudflare.com:3478"] }
         ];
         
         // Combine TURN servers (if any) with STUN fallbacks
@@ -138,35 +140,64 @@ export default {
         });
 
         const endpoints = [
+          `https://infer.roboflow.com/initialise_webrtc_worker`,
           `https://detect.roboflow.com/initialise_webrtc_worker`,
           `https://serverless.roboflow.com/initialise_webrtc_worker`,
         ];
 
-        let lastErrorResponse: any = null;
+        let lastErrorResponse: any = { status: 504, body: "All Roboflow endpoints timed out or failed" };
         for (const roboflowUrl of endpoints) {
-          const response = await fetch(roboflowUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(roboflowRequestBody),
-          });
+          try {
+            console.log(`[Proxy] Trying ${roboflowUrl}...`);
+            const startTime = Date.now();
+            
+            // Increase timeout to 30s for heavy models like SAM 3 to allow for cold starts
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-          if (response.ok) {
-            const data = await response.json();
-            return new Response(JSON.stringify(data), {
-              status: response.status,
-              headers: { 
-                "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*" 
-              },
+            const response = await fetch(roboflowUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(roboflowRequestBody),
+              signal: controller.signal,
             });
+
+            clearTimeout(timeoutId);
+            const elapsed = Date.now() - startTime;
+            console.log(`[Proxy] ${roboflowUrl} responded in ${elapsed}ms with status ${response.status}`);
+
+            if (response.ok) {
+              const data = await response.json();
+              console.log(`[Proxy] Success! WebRTC session initialized.`);
+              return new Response(JSON.stringify(data), {
+                status: response.status,
+                headers: { 
+                  "Content-Type": "application/json",
+                  "Access-Control-Allow-Origin": "*" 
+                },
+              });
+            }
+            lastErrorResponse = { status: response.status, body: await response.text() };
+            console.log(`[Proxy] ${roboflowUrl} failed with status ${response.status}: ${lastErrorResponse.body}`);
+          } catch (error: any) {
+            const elapsed = Date.now() - startTime;
+            console.log(`[Proxy] ${roboflowUrl} failed after ${elapsed}ms: ${error.message}`);
+            // If it's a timeout and we don't have a real response yet, update the lastError
+            if (error.name === 'AbortError' && lastErrorResponse.status === 504) {
+              lastErrorResponse = { status: 504, body: `Timeout calling ${roboflowUrl} after 30s` };
+            }
+            continue;
           }
-          lastErrorResponse = { status: response.status, body: await response.text() };
         }
         
         // Log error if initialization failed on all endpoints
         console.error(`WebRTC Init Failed. Last status: ${lastErrorResponse.status}, body: ${lastErrorResponse.body}`);
         
-        return new Response(lastErrorResponse.body, {
+        return new Response(JSON.stringify({ 
+          error: "Inference initialization failed", 
+          details: lastErrorResponse.body,
+          status: lastErrorResponse.status 
+        }), {
           status: lastErrorResponse.status,
           headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
         });
@@ -181,10 +212,15 @@ export default {
     // 4. Fallback to existing Inference Endpoint (Manual Mode)
     if (request.method === "POST") {
       try {
-        const { image } = await request.json() as { image: string };
+        const { image, requestedOutput, workflowId: customWorkflowId } = await request.json() as { 
+          image: string, 
+          requestedOutput?: string,
+          workflowId?: string 
+        };
         if (!image) return new Response("Missing image data", { status: 400 });
 
-        const roboflowUrl = `https://serverless.roboflow.com/${env.ROBOFLOW_WORKSPACE}/workflows/${env.ROBOFLOW_WORKFLOW_ID}`;
+        const workflowId = customWorkflowId || env.ROBOFLOW_WORKFLOW_ID;
+        const roboflowUrl = `https://serverless.roboflow.com/${env.ROBOFLOW_WORKSPACE}/workflows/${workflowId}`;
         const requestBody = {
           api_key: env.ROBOFLOW_API_KEY,
           inputs: {
@@ -204,8 +240,21 @@ export default {
         }
 
         const rawData = await response.json() as any;
-        const output0 = rawData.outputs?.[0] || {};
-        const predictions = output0.predictions?.predictions || output0.output?.predictions || output0.predictions || [];
+        const outputs = rawData.outputs?.[0] || rawData.outputs || {};
+        
+        // If a specific output was requested, try that first
+        let predictions: any[] = [];
+        if (requestedOutput && outputs[requestedOutput]) {
+          predictions = outputs[requestedOutput].predictions || outputs[requestedOutput];
+        } else {
+          // Fallback to the existing multi-key logic
+          predictions = outputs.model_predictions?.predictions || 
+                        outputs.predictions?.predictions || 
+                        outputs.output?.predictions || 
+                        outputs.predictions || 
+                        outputs.model_predictions || 
+                        [];
+        }
         
         // Convert center coordinates to top-left bbox format [x, y, w, h]
         const minifiedPredictions = predictions.map((p: any) => ({

@@ -6,7 +6,7 @@ const INFERENCE_WORKER_URL =
   Constants.expoConfig?.extra?.inferenceWorkerUrl || 'http://localhost:8787';
 
 export const useInference = () => {
-  const { setDetections, setInferring, updateInferenceTime } = useVisionStore();
+  const { setDetections, setInferring, updateInferenceTime, modelMode } = useVisionStore();
 
   return useMutation({
     mutationFn: async (base64Image: string): Promise<Detection[]> => {
@@ -15,7 +15,13 @@ export const useInference = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ image: base64Image }),
+        body: JSON.stringify({ 
+          image: base64Image,
+          // Use the separate realtime workflow for FAST mode to avoid SAM3 compatibility issues
+          workflowId: modelMode === 'FAST' ? 'extra-vision-ai-realtime' : 'extra-vision-ai',
+          // Both workflows use "predictions" as the final output key for detections
+          requestedOutput: 'predictions'
+        }),
       });
 
       if (!response.ok) {

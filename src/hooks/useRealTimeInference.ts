@@ -14,6 +14,7 @@ export const useRealTimeInference = () => {
   const { 
     isRealTimeEnabled, 
     isPlaying,
+    modelMode,
     setDetections, 
     setStreaming, 
     setStreamingError,
@@ -46,6 +47,9 @@ export const useRealTimeInference = () => {
       console.log('Starting real-time streaming...');
       setStreamingError(null);
       
+      // Give the camera a moment to stabilize before starting the stream
+      await new Promise(resolve => setTimeout(resolve, 500));
+
       const stream = await mediaDevices.getUserMedia({
         audio: false,
         video: {
@@ -69,22 +73,28 @@ export const useRealTimeInference = () => {
         source: stream as any,
         connector,
         wrtcParams: {
-          // Request the "predictions" output from the workflow
-          // Error message confirms available outputs are: ['predictions', 'visualization']
+          // Use the separate realtime workflow for FAST mode to avoid SAM3 compatibility issues
+          workflowId: modelMode === 'FAST' ? 'extra-vision-ai-realtime' : 'extra-vision-ai',
+          // Use the appropriate output based on modelMode
+          // In the realtime workflow, YOLO results are in "predictions"
+          // In the main workflow, SAM3 results are in "predictions"
           dataOutputNames: ["predictions"],
           // We don't need a video stream output from the server
           streamOutputNames: [],
+          // Help ICE connection by being explicit with STUN servers
+          iceServers: [
+            { urls: ["stun:stun.l.google.com:19302"] },
+            { urls: ["stun:stun1.l.google.com:19302"] },
+            { urls: ["stun:stun2.l.google.com:19302"] },
+            { urls: ["stun:stun.cloudflare.com:3478"] }
+          ],
           requestedPlan: 'webrtc-gpu-large',
           requestedRegion: 'us',
           realtimeProcessing: true
         },
-        onComplete: () => {
-          console.log('[WebRTC] Data channel closed - stream completed');
-        },
         onData: (data: any) => {
-          // Log errors if present (but don't stop processing - some frames may have errors)
+          // Log errors if present
           if (data.errors && data.errors.length > 0) {
-            // Only log non-GPU errors (GPU errors are common and non-fatal)
             const nonGpuErrors = data.errors.filter((e: string) => !e.includes('NVML') && !e.includes('PyTorch'));
             if (nonGpuErrors.length > 0) {
               console.warn('[WebRTC] Frame errors:', nonGpuErrors);
@@ -93,121 +103,58 @@ export const useRealTimeInference = () => {
           
           let predictions: any[] | null = null;
           
-          // Roboflow WebRTC sends data in serialized_output_data when block outputs are requested
-          if (data.serialized_output_data !== undefined && data.serialized_output_data !== null) {
+          if (data.serialized_output_data) {
             const serialized = data.serialized_output_data;
             
-            // Log the actual structure to debug
-            console.log('[WebRTC] serialized_output_data:', JSON.stringify(serialized).substring(0, 300));
+            // Try different paths for predictions
+            // 1. serialized.predictions
+            // 2. serialized.rapid_model (direct block ID)
+            // 3. serialized.rapid_model.predictions (nested in block)
             
-            // The workflow blocks are: "rapid_model" and "visualization"
-            // The response outputs are likely: "predictions" and "visualization"
-            // Structure: serialized_output_data.rapid_model.predictions (array of detections)
-            if (serialized.predictions) {
-              if (Array.isArray(serialized.predictions)) {
-                predictions = serialized.predictions;
-                console.log(`[WebRTC] ✓ Found ${predictions.length} predictions in serialized.predictions`);
-              } else if (serialized.predictions.predictions) {
-                predictions = serialized.predictions.predictions;
-                console.log(`[WebRTC] ✓ Found ${predictions.length} predictions in serialized.predictions.predictions`);
-              }
-            }
+            const possiblePaths = [
+              serialized.model_predictions, // Prioritize YOLO fast branch
+              serialized.predictions,       // Fallback to SAM 3
+              serialized.rapid_model,
+              serialized.yolo_fast,
+              serialized.yolo_fast?.predictions,
+              serialized.rapid_model?.predictions,
+              serialized.predictions?.predictions,
+              serialized.model_predictions?.predictions
+            ];
 
-            if (!predictions && serialized.rapid_model) {
-              if (Array.isArray(serialized.rapid_model)) {
-                // Direct array
-                predictions = serialized.rapid_model;
-                console.log(`[WebRTC] ✓ Found ${predictions.length} predictions in serialized.rapid_model`);
-              } else if (serialized.rapid_model.predictions) {
-                // Block output structure: rapid_model.predictions
-                if (Array.isArray(serialized.rapid_model.predictions)) {
-                  predictions = serialized.rapid_model.predictions;
-                  console.log(`[WebRTC] ✓ Found ${predictions.length} predictions in serialized.rapid_model.predictions`);
-                } else if (serialized.rapid_model.predictions.predictions) {
-                  // Nested: rapid_model.predictions.predictions
-                  predictions = serialized.rapid_model.predictions.predictions;
-                  console.log(`[WebRTC] ✓ Found ${predictions.length} predictions in serialized.rapid_model.predictions.predictions`);
-                }
+            for (const path of possiblePaths) {
+              if (Array.isArray(path)) {
+                predictions = path;
+                break;
               }
             }
             
             if (!predictions) {
-              console.log('[WebRTC] ✗ No predictions in serialized_output_data. Keys:', Object.keys(serialized));
-            }
-          } else {
-            console.log('[WebRTC] serialized_output_data is null/undefined');
-          }
-          
-          // Fallback to other possible structures if not found yet
-          if (!predictions && data.predictions) {
-            predictions = Array.isArray(data.predictions) ? data.predictions : null;
-            console.log('[WebRTC] Found predictions in data.predictions');
-          }
-          
-          if (!predictions && data.outputs) {
-            if (Array.isArray(data.outputs) && data.outputs[0]) {
-              const output0 = data.outputs[0];
-              predictions = output0.predictions?.predictions || output0.output?.predictions || output0.predictions;
-              console.log('[WebRTC] Found predictions in data.outputs[0]');
-            } else if (data.outputs.predictions) {
-              predictions = data.outputs.predictions;
-              console.log('[WebRTC] Found predictions in data.outputs.predictions');
+              console.log('[WebRTC] No predictions found in serialized_output_data. Keys:', Object.keys(serialized));
             }
           }
           
-          if (!predictions && data.data_output) {
-            predictions = data.data_output;
-            console.log('[WebRTC] Found predictions in data.data_output');
-          }
-          
-          if (!predictions) {
-            console.log('[WebRTC] No predictions found. Top-level keys:', Object.keys(data));
+          // Fallback to top-level data.predictions
+          if (!predictions && Array.isArray(data.predictions)) {
+            predictions = data.predictions;
           }
 
           if (predictions && Array.isArray(predictions)) {
-            console.log(`[WebRTC] Processing ${predictions.length} predictions`);
             const mappedDetections: Detection[] = predictions.map((p: any) => {
-              // Roboflow WebRTC uses center coordinates: {x, y, width, height}
-              // Convert center (x, y) to top-left corner for bbox format [x, y, w, h]
+              // Convert center (x, y) to top-left corner [x, y, w, h]
               const centerX = p.x || 0;
               const centerY = p.y || 0;
               const width = p.width || 0;
               const height = p.height || 0;
               
-              const bbox: [number, number, number, number] = [
-                centerX - width / 2,  // top-left x
-                centerY - height / 2, // top-left y
-                width,
-                height
-              ];
-              
-              // Map class_id to label (class_id 1 is typically "car" in most models)
-              const classId = p.class_id;
-              const labelMap: Record<number, string> = {
-                1: 'car',
-                2: 'person',
-                3: 'truck',
-                4: 'bus',
-                5: 'motorcycle',
-                6: 'bicycle',
-              };
-              
               return {
-                bbox,
-                label: p.class || p.label || p.class_name || labelMap[classId] || `class_${classId}` || 'unknown',
+                bbox: [centerX - width / 2, centerY - height / 2, width, height],
+                label: p.class || p.label || p.class_name || 'unknown',
                 score: p.confidence || p.score || 0,
               };
             });
             
-            console.log(`[WebRTC] Mapped ${mappedDetections.length} detections:`, mappedDetections.map(d => d.label));
             setDetections(mappedDetections);
-          } else {
-            // No valid predictions array in this frame (could be skipped or error)
-            // DO NOT clear detections here. Keeping the last valid detections on screen
-            // provides a smoother experience when inference is slower than frame rate.
-            if (data.serialized_output_data === null) {
-              console.log('[WebRTC] Frame skipped (no output data)');
-            }
           }
         },
         options: {
@@ -217,22 +164,37 @@ export const useRealTimeInference = () => {
 
       sessionRef.current = session;
       
-      // Check connection state after a delay
-      setTimeout(async () => {
+      // Monitor connection state
+      const checkConnection = setInterval(() => {
         try {
-          // Access the internal peer connection to check connection state
           const pc = (session as any).pc;
           if (pc) {
-            console.log('[WebRTC] Peer connection state:', pc.connectionState);
-            console.log('[WebRTC] ICE connection state:', pc.iceConnectionState);
+            // Log full connection info for debugging
+            console.log(`[WebRTC] PC State: ${pc.connectionState}, ICE State: ${pc.iceConnectionState}`);
+            
+            // Check if we have any remote candidates yet
+            if (pc.iceConnectionState === 'checking' || pc.iceConnectionState === 'connected') {
+              console.log('[WebRTC] ICE candidate gathering/connection in progress...');
+            }
+            
+            if (pc.connectionState === 'connected') {
+              setStreaming(true);
+              clearInterval(checkConnection);
+            }
+            
+            if (pc.connectionState === 'failed') {
+              setStreamingError('WebRTC Connection Failed');
+              clearInterval(checkConnection);
+            }
           }
         } catch (e) {
-          console.log('[WebRTC] Could not access peer connection:', e);
+          // Ignore errors during poll
         }
-        
-        setStreaming(true);
-        console.log('Real-time session established.');
-      }, 2000);
+      }, 1000);
+      
+      // Cleanup interval after 10s if not connected
+      setTimeout(() => clearInterval(checkConnection), 10000);
+
     } catch (err: any) {
       console.error('Failed to start real-time streaming:', err);
       setStreamingError(err.message || 'Failed to start streaming');

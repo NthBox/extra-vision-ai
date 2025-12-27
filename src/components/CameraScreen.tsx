@@ -27,6 +27,8 @@ export const CameraScreen = () => {
     setVisualizationMode,
     threeViewMode,
     setThreeViewMode,
+    modelMode,
+    setModelMode,
     cameraConfig,
     updateCameraConfig
   } = useVisionStore();
@@ -110,12 +112,19 @@ export const CameraScreen = () => {
   return (
     <View style={styles.container}>
       <View style={styles.cameraContainer}>
-        {isRealTimeEnabled && stream ? (
-          <RTCView
-            streamURL={stream.toURL()}
-            style={styles.camera}
-            objectFit="cover"
-          />
+        {isRealTimeEnabled ? (
+          stream ? (
+            <RTCView
+              streamURL={stream.toURL()}
+              style={styles.camera}
+              objectFit="cover"
+            />
+          ) : (
+            <View style={[styles.camera, styles.initializingContainer]}>
+              <Text style={styles.initializingText}>INITIALIZING LIVE STREAM...</Text>
+              {isStreaming && <Text style={styles.subText}>CONNECTING TO ROBOFLOW...</Text>}
+            </View>
+          )
         ) : (
           <CameraView
             style={styles.camera}
@@ -184,6 +193,13 @@ export const CameraScreen = () => {
             >
               <Text style={styles.iconButtonText}>LIVE</Text>
             </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.iconButton, modelMode === 'ACCURATE' && styles.activeIconButton]} 
+              onPress={() => setModelMode(modelMode === 'FAST' ? 'ACCURATE' : 'FAST')}
+            >
+              <Text style={styles.iconButtonText}>{modelMode === 'FAST' ? 'YOLO' : 'SAM3'}</Text>
+            </TouchableOpacity>
           </View>
 
           <View style={styles.statusBadge}>
@@ -225,6 +241,23 @@ const styles = StyleSheet.create({
   },
   camera: {
     flex: 1,
+  },
+  initializingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#000',
+  },
+  initializingText: {
+    color: '#007AFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+    letterSpacing: 1,
+  },
+  subText: {
+    color: '#4CAF50',
+    fontSize: 10,
+    marginTop: 8,
+    fontWeight: 'bold',
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,

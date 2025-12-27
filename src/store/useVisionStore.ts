@@ -52,6 +52,7 @@ interface VisionState {
   isPlaying: boolean;
   visualizationMode: 'CAMERA' | '3D';
   threeViewMode: 'REAL' | 'SIMULATED';
+  modelMode: 'FAST' | 'ACCURATE'; // FAST = YOLO, ACCURATE = SAM3
   
   // Camera Model fields
   cameraConfig: CameraConfig;
@@ -67,6 +68,7 @@ interface VisionState {
   setIsPlaying: (isPlaying: boolean) => void;
   setVisualizationMode: (mode: 'CAMERA' | '3D') => void;
   setThreeViewMode: (mode: 'REAL' | 'SIMULATED') => void;
+  setModelMode: (mode: 'FAST' | 'ACCURATE') => void;
   
   // Camera Model setters
   updateCameraConfig: (config: Partial<CameraConfig>) => void;
@@ -84,6 +86,7 @@ export const useVisionStore = create<VisionState>((set) => ({
   isPlaying: false,
   visualizationMode: 'CAMERA',
   threeViewMode: 'SIMULATED',
+  modelMode: 'FAST',
   cameraConfig: CAMERA_PRESETS.WIDE,
 
   setDetections: (detections) => set({ detections }),
@@ -96,6 +99,7 @@ export const useVisionStore = create<VisionState>((set) => ({
   setIsPlaying: (isPlaying) => set({ isPlaying }),
   setVisualizationMode: (visualizationMode) => set({ visualizationMode }),
   setThreeViewMode: (threeViewMode) => set({ threeViewMode }),
+  setModelMode: (modelMode) => set({ modelMode }),
   
   updateCameraConfig: (config) => set((state) => ({ 
     cameraConfig: { ...state.cameraConfig, ...config } 
