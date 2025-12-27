@@ -11,6 +11,7 @@ export interface CameraConfig {
   height: number;       // Camera mounting height in meters
   pitch: number;        // Camera tilt in radians (negative = looking down)
   opticalCenter: [number, number]; // [cx, cy] normalized (0.5, 0.5 default)
+  horizontalOffset: number; // Nudge objects left/right (-0.5 to 0.5, default 0)
 }
 
 export type CameraPreset = 'WIDE' | 'ULTRA_WIDE' | 'TELE';
@@ -21,18 +22,21 @@ const CAMERA_PRESETS: Record<CameraPreset, CameraConfig> = {
     height: 1.2,
     pitch: -0.05, // ~3 degrees down
     opticalCenter: [0.5, 0.5],
+    horizontalOffset: 0,
   },
   ULTRA_WIDE: {
     fov: 120,
     height: 1.2,
     pitch: -0.05,
     opticalCenter: [0.5, 0.5],
+    horizontalOffset: 0,
   },
   TELE: {
     fov: 30,
     height: 1.2,
     pitch: -0.02,
     opticalCenter: [0.5, 0.5],
+    horizontalOffset: 0,
   }
 };
 

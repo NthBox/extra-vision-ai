@@ -26,7 +26,9 @@ export const CameraScreen = () => {
     visualizationMode,
     setVisualizationMode,
     threeViewMode,
-    setThreeViewMode
+    setThreeViewMode,
+    cameraConfig,
+    updateCameraConfig
   } = useVisionStore();
   
   const { mutate: runInference } = useInference();
@@ -143,12 +145,28 @@ export const CameraScreen = () => {
             </TouchableOpacity>
 
             {visualizationMode === '3D' && (
-              <TouchableOpacity 
-                style={[styles.iconButton, threeViewMode === 'REAL' && styles.activeIconButton]} 
-                onPress={() => setThreeViewMode(threeViewMode === 'REAL' ? 'SIMULATED' : 'REAL')}
-              >
-                <Text style={styles.iconButtonText}>{threeViewMode === 'REAL' ? 'RL' : 'SIM'}</Text>
-              </TouchableOpacity>
+              <>
+                <TouchableOpacity 
+                  style={[styles.iconButton, threeViewMode === 'REAL' && styles.activeIconButton]} 
+                  onPress={() => setThreeViewMode(threeViewMode === 'REAL' ? 'SIMULATED' : 'REAL')}
+                >
+                  <Text style={styles.iconButtonText}>{threeViewMode === 'REAL' ? 'RL' : 'SIM'}</Text>
+                </TouchableOpacity>
+
+                {/* Calibration Nudge Buttons */}
+                <TouchableOpacity 
+                  style={styles.iconButton} 
+                  onPress={() => updateCameraConfig({ horizontalOffset: cameraConfig.horizontalOffset - 0.01 })}
+                >
+                  <Text style={styles.iconButtonText}>L</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.iconButton} 
+                  onPress={() => updateCameraConfig({ horizontalOffset: cameraConfig.horizontalOffset + 0.01 })}
+                >
+                  <Text style={styles.iconButtonText}>R</Text>
+                </TouchableOpacity>
+              </>
             )}
           </View>
 
@@ -170,7 +188,7 @@ export const CameraScreen = () => {
 
           <View style={styles.statusBadge}>
             <Text style={styles.statusText}>
-              {detections.length} OBJ
+              {detections.length} OBJ {visualizationMode === '3D' ? `| CAL: ${(cameraConfig.horizontalOffset * 100).toFixed(0)}` : ''}
             </Text>
           </View>
         </View>

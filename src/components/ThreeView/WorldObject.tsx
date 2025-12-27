@@ -72,6 +72,7 @@ export const WorldObject = ({ detection }: WorldObjectProps) => {
     if (threeViewMode === 'SIMULATED') {
       // --- Simulated Math Implementation (Tesla/Waymo style) ---
       const MAX_RANGE = 80; // Total visual depth
+      const { horizontalOffset } = cameraConfig;
       
       // 1. Relative Depth (Z)
       const yBottom = normY + normH;
@@ -81,15 +82,17 @@ export const WorldObject = ({ detection }: WorldObjectProps) => {
       const t = Math.max(0, (yBottom - horizon) / (1.0 - horizon));
       
       // Steep power curve (2.5) pulls objects MUCH closer to the car.
-      // Objects in the bottom half of the screen will stay very close to the bumper.
       const distZ = -Math.pow(1 - t, 2.5) * MAX_RANGE;
 
       // 2. Relative Lateral (X)
-      const xCenter = normX + normW / 2;
+      // FIX: Apply horizontal offset to calibrate center alignment
+      const xCenter = (normX + normW / 2) + horizontalOffset;
       
-      // Narrower base width (12m) to keep objects in line with the vehicle's actual path
-      const viewWidthAtBumper = 12; 
-      const viewWidthAtHorizon = 40;
+      // FIX: Road-Width Compression & Trapezoidal Projection
+      // A standard 3-lane road is roughly 12m wide.
+      // We make the view narrower at the horizon to match real perspective.
+      const viewWidthAtBumper = 14; 
+      const viewWidthAtHorizon = 24; 
       const effectiveWidth = viewWidthAtBumper + (1 - t) * (viewWidthAtHorizon - viewWidthAtBumper);
       
       const posX = (xCenter - 0.5) * effectiveWidth;
