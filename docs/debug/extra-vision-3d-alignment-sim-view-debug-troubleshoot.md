@@ -22,7 +22,7 @@
 
 ## Approaches That Worked
 - **Power-Curve Depth**: Using a quadratic/power curve (`Math.pow(1-t, 2.5)`) for simulated depth successfully pulled middle-ground objects closer, matching human intuition.
-- **Low-Profile Chase Cam**: Moving the 3D camera to a tighter position (8m behind, 5m height) anchored the Ego car at the bottom edge and provided an intimate "one car behind" perspective.
+- **Low-Profile Chase Cam**: Moving the 3D camera lower and steeper anchored the Ego car at the bottom edge, maximizing road visibility.
 - **Compact UIUX**: Consolidating 3D/SIM/REAL toggles into a single bottom row significantly improved the testing workflow.
 - **Center Calibration**: Allowing for a `horizontalOffset` in the projection math successfully aligned the lead vehicle with the Ego path.
 

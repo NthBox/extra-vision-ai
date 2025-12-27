@@ -8,18 +8,32 @@ import { EgoVehicle } from './EgoVehicle';
 import { DetectionRenderer } from './DetectionRenderer';
 
 export const ThreeViewContainer = () => {
-  const { cameraConfig, threeViewMode } = useVisionStore();
+  const { cameraConfig, threeViewMode, simulatedViewZoom } = useVisionStore();
   
   // Camera settings based on mode
-  const cameraPos: [number, number, number] = threeViewMode === 'SIMULATED' 
-    ? [0, 5, 8] // Close chase cam (roughly one car length behind ego)
-    : [0, cameraConfig.height, 0]; 
-    
-  const cameraRot: [number, number, number] = threeViewMode === 'SIMULATED'
-    ? [-0.4, 0, 0] // Tilted to keep ego car at bottom and horizon in view
-    : [cameraConfig.pitch, 0, 0]; 
+  let cameraPos: [number, number, number];
+  let cameraRot: [number, number, number];
+  let cameraFov: number;
 
-  const cameraFov = threeViewMode === 'SIMULATED' ? 75 : cameraConfig.fov;
+  if (threeViewMode === 'SIMULATED') {
+    if (simulatedViewZoom === 'ZOOMED') {
+      // Zoomed actionable view: Closer Z, narrower FOV
+      // We keep height at 10m as requested
+      cameraPos = [0, 10, 8]; 
+      cameraRot = [-0.5, 0, 0]; // Steeper tilt to keep car anchored at bottom edge
+      cameraFov = 50;
+    } else {
+      // Standard overview
+      cameraPos = [0, 10, 15];
+      cameraRot = [-0.3, 0, 0];
+      cameraFov = 70;
+    }
+  } else {
+    // Physical mounting position for real view
+    cameraPos = [0, cameraConfig.height, 0];
+    cameraRot = [cameraConfig.pitch, 0, 0];
+    cameraFov = cameraConfig.fov;
+  }
 
   return (
     <View style={styles.container}>

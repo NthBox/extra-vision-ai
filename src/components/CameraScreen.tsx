@@ -27,6 +27,8 @@ export const CameraScreen = () => {
     setVisualizationMode,
     threeViewMode,
     setThreeViewMode,
+    simulatedViewZoom,
+    setSimulatedViewZoom,
     cameraConfig,
     updateCameraConfig
   } = useVisionStore();
@@ -152,6 +154,15 @@ export const CameraScreen = () => {
                 >
                   <Text style={styles.iconButtonText}>{threeViewMode === 'REAL' ? 'RL' : 'SIM'}</Text>
                 </TouchableOpacity>
+
+                {threeViewMode === 'SIMULATED' && (
+                  <TouchableOpacity 
+                    style={[styles.iconButton, simulatedViewZoom === 'ZOOMED' && styles.activeIconButton]} 
+                    onPress={() => setSimulatedViewZoom(simulatedViewZoom === 'ZOOMED' ? 'NORMAL' : 'ZOOMED')}
+                  >
+                    <Text style={styles.iconButtonText}>{simulatedViewZoom === 'ZOOMED' ? 'Z' : 'N'}</Text>
+                  </TouchableOpacity>
+                )}
 
                 {/* Calibration Nudge Buttons */}
                 <TouchableOpacity 
