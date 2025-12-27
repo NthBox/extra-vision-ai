@@ -24,7 +24,9 @@ export const CameraScreen = () => {
     isPlaying,
     setIsPlaying,
     visualizationMode,
-    setVisualizationMode
+    setVisualizationMode,
+    threeViewMode,
+    setThreeViewMode
   } = useVisionStore();
   
   const { mutate: runInference } = useInference();
@@ -131,51 +133,61 @@ export const CameraScreen = () => {
       <HUDOverlay />
       
       <View style={styles.overlay}>
-        <View style={styles.controlsContainer}>
-          <View style={styles.modeToggleContainer}>
-            <View style={[styles.toggleContainer, { backgroundColor: 'rgba(255,152,0,0.3)' }]}>
-              <Text style={[styles.toggleLabel, { color: '#ff9800' }]}>3D View</Text>
-              <Switch
-                value={visualizationMode === '3D'}
-                onValueChange={(val) => {
-                  console.log('Changing visualization mode to:', val ? '3D' : 'CAMERA');
-                  setVisualizationMode(val ? '3D' : 'CAMERA');
-                }}
-                trackColor={{ false: "#767577", true: "#ff9800" }}
-                thumbColor={visualizationMode === '3D' ? "#fff" : "#f4f3f4"}
-              />
-            </View>
+        <View style={styles.bottomControlsBar}>
+          <View style={styles.controlGroup}>
+            <TouchableOpacity 
+              style={[styles.iconButton, visualizationMode === '3D' && styles.activeIconButton]} 
+              onPress={() => setVisualizationMode(visualizationMode === '3D' ? 'CAMERA' : '3D')}
+            >
+              <Text style={styles.iconButtonText}>3D</Text>
+            </TouchableOpacity>
+
+            {visualizationMode === '3D' && (
+              <TouchableOpacity 
+                style={[styles.iconButton, threeViewMode === 'REAL' && styles.activeIconButton]} 
+                onPress={() => setThreeViewMode(threeViewMode === 'REAL' ? 'SIMULATED' : 'REAL')}
+              >
+                <Text style={styles.iconButtonText}>{threeViewMode === 'REAL' ? 'RL' : 'SIM'}</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
-          <View style={styles.topControls}>
-            <View style={styles.toggleContainer}>
-              <Text style={styles.toggleLabel}>Real-time</Text>
-              <Switch
-                value={isRealTimeEnabled}
-                onValueChange={setRealTimeEnabled}
-                trackColor={{ false: "#767577", true: "#0a7ea4" }}
-                thumbColor={isRealTimeEnabled ? "#fff" : "#f4f3f4"}
-              />
-            </View>
-
+          <View style={styles.mainControls}>
             <TouchableOpacity 
               style={[styles.playButton, isPlaying ? styles.pauseButton : styles.startButton]} 
               onPress={() => setIsPlaying(!isPlaying)}
             >
               <Text style={styles.playButtonText}>{isPlaying ? 'PAUSE' : 'PLAY'}</Text>
             </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.iconButton, isRealTimeEnabled && styles.activeIconButton]} 
+              onPress={() => setRealTimeEnabled(!isRealTimeEnabled)}
+            >
+              <Text style={styles.iconButtonText}>LIVE</Text>
+            </TouchableOpacity>
           </View>
-          
-          <View style={styles.statusContainer}>
+
+          <View style={styles.statusBadge}>
             <Text style={styles.statusText}>
-              {!isPlaying 
-                ? 'PAUSED'
-                : (isRealTimeEnabled 
-                  ? (isStreaming ? `LIVE | Objects: ${detections.length}` : 'Connecting...') 
-                  : (isInferring ? 'Detecting...' : `Objects: ${detections.length}`))}
+              {detections.length} OBJ
             </Text>
           </View>
         </View>
+
+        {visualizationMode === '3D' && threeViewMode === 'REAL' && (
+          <View style={styles.presetOverlay}>
+            <TouchableOpacity onPress={() => useVisionStore.getState().setCameraPreset('ULTRA_WIDE')} style={styles.presetBadge}>
+              <Text style={styles.presetText}>UW</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => useVisionStore.getState().setCameraPreset('WIDE')} style={styles.presetBadge}>
+              <Text style={styles.presetText}>W</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => useVisionStore.getState().setCameraPreset('TELE')} style={styles.presetBadge}>
+              <Text style={styles.presetText}>T</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -200,38 +212,52 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'transparent',
     justifyContent: 'flex-end',
-    alignItems: 'center',
-    paddingBottom: 40,
+    paddingBottom: 30,
     zIndex: 10,
   },
-  controlsContainer: {
-    alignItems: 'center',
-    gap: 10,
-  },
-  topControls: {
+  bottomControlsBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-  },
-  modeToggleContainer: {
-    marginBottom: 5,
-  },
-  toggleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    marginHorizontal: 20,
     paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 25,
-    gap: 10,
+    paddingVertical: 10,
+    borderRadius: 30,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  controlGroup: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  mainControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activeIconButton: {
+    backgroundColor: '#007AFF',
+  },
+  iconButtonText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   playButton: {
     paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 25,
-    minWidth: 80,
+    paddingVertical: 8,
+    borderRadius: 20,
+    minWidth: 70,
     alignItems: 'center',
-    justifyContent: 'center',
   },
   startButton: {
     backgroundColor: '#4CAF50',
@@ -241,13 +267,40 @@ const styles = StyleSheet.create({
   },
   playButtonText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: 'bold',
   },
-  toggleLabel: {
+  statusBadge: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  statusText: {
+    color: '#aaa',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  presetOverlay: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    gap: 8,
+  },
+  presetBadge: {
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  presetText: {
     color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   message: {
     textAlign: 'center',
@@ -257,17 +310,6 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#0a7ea4',
     fontSize: 18,
-    fontWeight: 'bold',
-  },
-  statusContainer: {
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-  },
-  statusText: {
-    color: '#fff',
-    fontSize: 14,
     fontWeight: 'bold',
   },
 });

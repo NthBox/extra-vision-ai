@@ -1,7 +1,8 @@
-import React, { useRef, useMemo } from 'react';
-import { useFrame } from '@react-three/fiber';
+import React, { useRef, useMemo, useState, useEffect } from 'react';
+import { useFrame, useThree } from '@react-three/fiber';
 import { Box, Cylinder } from '@react-three/drei';
 import * as THREE from 'three';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import { Detection, useVisionStore } from '../../store/useVisionStore';
 
 interface WorldObjectProps {
@@ -10,35 +11,136 @@ interface WorldObjectProps {
 
 export const WorldObject = ({ detection }: WorldObjectProps) => {
   const meshRef = useRef<THREE.Group>(null);
-  const { imageDimensions } = useVisionStore();
+  const { imageDimensions, cameraConfig, threeViewMode } = useVisionStore();
+  const { size: screen } = useThree();
+  
+  const [orientation, setOrientation] = useState<ScreenOrientation.Orientation>(
+    ScreenOrientation.Orientation.PORTRAIT_UP
+  );
+
+  useEffect(() => {
+    let isMounted = true;
+    const initOrientation = async () => {
+      try {
+        const current = await ScreenOrientation.getOrientationAsync();
+        if (isMounted) setOrientation(current);
+      } catch (e) {
+        // Fallback or ignore if module not available
+      }
+    };
+    initOrientation();
+
+    const subscription = ScreenOrientation.addOrientationChangeListener((event) => {
+      if (isMounted) setOrientation(event.orientationInfo.orientation);
+    });
+
+    return () => {
+      isMounted = false;
+      ScreenOrientation.removeOrientationChangeListener(subscription);
+    };
+  }, []);
   
   const { label, bbox } = detection;
   const [x, y, w, h] = bbox;
-  
-  // Projection Constants
-  const DEPTH_SCALE = 40; // Max distance in meters
-  const LATERAL_SCALE = 1.5; // Correction for FOV
 
   const targetPosition = useMemo(() => {
-    const imgWidth = imageDimensions.width;
-    const imgHeight = imageDimensions.height;
+    const INPUT_WIDTH = imageDimensions.width;
+    const INPUT_HEIGHT = imageDimensions.height;
     
-    // Depth (Z): Closer to bottom (y+h high) means closer to car (Z=0)
-    // We use a quadratic scale for better perspective feel
-    const bottomYNormalized = (y + h) / imgHeight;
-    const distZ = -Math.pow(1 - bottomYNormalized, 1.5) * DEPTH_SCALE;
+    // Detect if the sensor matches the UI orientation
+    const isUIInPortrait = screen.height > screen.width;
+    const isSensorInPortrait = INPUT_HEIGHT > INPUT_WIDTH;
+    const needsRotation = isUIInPortrait !== isSensorInPortrait;
+
+    let normX, normY, normW, normH;
+
+    if (needsRotation) {
+      // Map sensor-space (Landscape) to UI-space (Portrait)
+      // Standard 90deg CCW transform
+      normX = y / INPUT_HEIGHT;
+      normY = (INPUT_WIDTH - (x + w)) / INPUT_WIDTH;
+      normW = h / INPUT_HEIGHT;
+      normH = w / INPUT_WIDTH;
+    } else {
+      // Normal 1:1 mapping
+      normX = x / INPUT_WIDTH;
+      normY = y / INPUT_HEIGHT;
+      normW = w / INPUT_WIDTH;
+      normH = h / INPUT_HEIGHT;
+    }
     
-    // Lateral (X): Horizontal center
-    const centerXNormalized = (x + w / 2) / imgWidth;
-    const posX = (centerXNormalized - 0.5) * Math.abs(distZ) * LATERAL_SCALE;
+    if (threeViewMode === 'SIMULATED') {
+      // --- Simulated Math Implementation (Tesla/Waymo style) ---
+      const MAX_RANGE = 80; // Total visual depth
+      
+      // 1. Relative Depth (Z)
+      const yBottom = normY + normH;
+      
+      // Pull horizon up slightly to give more room for the ground mapping
+      const horizon = 0.35; 
+      const t = Math.max(0, (yBottom - horizon) / (1.0 - horizon));
+      
+      // Steep power curve (2.5) pulls objects MUCH closer to the car.
+      // Objects in the bottom half of the screen will stay very close to the bumper.
+      const distZ = -Math.pow(1 - t, 2.5) * MAX_RANGE;
+
+      // 2. Relative Lateral (X)
+      const xCenter = normX + normW / 2;
+      
+      // Narrower base width (12m) to keep objects in line with the vehicle's actual path
+      const viewWidthAtBumper = 12; 
+      const viewWidthAtHorizon = 40;
+      const effectiveWidth = viewWidthAtBumper + (1 - t) * (viewWidthAtHorizon - viewWidthAtBumper);
+      
+      const posX = (xCenter - 0.5) * effectiveWidth;
+
+      return new THREE.Vector3(posX, 0, distZ);
+    }
+
+    // --- REAL IPM Math Implementation ---
+    const { fov, height: camHeight, pitch, opticalCenter } = cameraConfig;
+    const [cx, cy] = opticalCenter;
+
+    // 1. Calculate Focal Length (f) in normalized units
+    // f = 0.5 / tan(fov/2)
+    const focalLength = 0.5 / Math.tan((fov * Math.PI / 180) / 2);
+
+    // 2. Map pixel y to vertical angle (alpha)
+    // The bottom of the box (normY + normH) is used for ground distance
+    const yBottom = normY + normH;
+    const dy = yBottom - cy;
+    const alpha = Math.atan(dy / focalLength);
+
+    // 3. Calculate Depth (Z)
+    // Z = height / tan(pitch + alpha)
+    // We use Math.abs to ensure positive distance and cap it for stability
+    const totalAngle = pitch + alpha;
+    let distZ = 0;
+    
+    if (Math.abs(totalAngle) > 0.01) {
+      distZ = -camHeight / Math.tan(totalAngle);
+    } else {
+      distZ = -50; // Fallback for horizon
+    }
+
+    // Clip depth to reasonable range [0, 100]
+    distZ = Math.max(-100, Math.min(0, distZ));
+    
+    // 4. Calculate Lateral (X)
+    // X = (x_center - cx) * Z / f
+    const xCenter = normX + normW / 2;
+    const dx = xCenter - cx;
+    const posX = dx * Math.abs(distZ) / focalLength;
     
     return new THREE.Vector3(posX, 0, distZ);
-  }, [x, y, w, h, imageDimensions]);
+  }, [x, y, w, h, imageDimensions, screen.width, screen.height, cameraConfig]);
 
   useFrame((state, delta) => {
     if (meshRef.current) {
       // Smooth interpolation (lerp)
-      meshRef.current.position.lerp(targetPosition, 0.1);
+      // Faster lerp for simulated mode for "Tesla" feel
+      const lerpFactor = threeViewMode === 'SIMULATED' ? 0.15 : 0.1;
+      meshRef.current.position.lerp(targetPosition, lerpFactor);
     }
   });
 

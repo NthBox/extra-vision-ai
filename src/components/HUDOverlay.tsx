@@ -122,11 +122,11 @@ export const HUDOverlay = () => {
             // Case: UI is Portrait, but Sensor is Landscape
             // Apply 90deg CCW transform to map sensor-space to portrait-screen-space
             const mappedX = y;
-            const mappedY = INPUT_WIDTH - x;
+            const mappedY = INPUT_WIDTH - (x + w); // Adjust for top-left mapping
             rectW = h * scale;
             rectH = w * scale;
-            rectX = mappedX * scale - rectW / 2 - offsetX;
-            rectY = mappedY * scale - rectH / 2 - offsetY;
+            rectX = mappedX * scale - offsetX;
+            rectY = mappedY * scale - offsetY;
 
             // In Portrait mode, the UI is vertical, so we might need to level the text
             // depending on which way the phone is "up"
@@ -137,11 +137,11 @@ export const HUDOverlay = () => {
           else {
             // Case: UI orientation matches Sensor (Landscape Left or Right)
             // OS handles the rotation of the SVG coordinate system and the camera buffer.
-            // We use direct 1:1 mapping.
+            // We use direct 1:1 mapping from top-left.
             rectW = w * scale;
             rectH = h * scale;
-            rectX = x * scale - rectW / 2 - offsetX;
-            rectY = y * scale - rectH / 2 - offsetY;
+            rectX = x * scale - offsetX;
+            rectY = y * scale - offsetY;
             
             // Text should be upright in landscape natively
             textRotation = 0;
