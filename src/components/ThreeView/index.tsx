@@ -12,14 +12,14 @@ export const ThreeViewContainer = () => {
   
   // Camera settings based on mode
   const cameraPos: [number, number, number] = threeViewMode === 'SIMULATED' 
-    ? [0, 8, 12] // Closer and lower chase cam for more intimacy
+    ? [0, 5, 8] // Close chase cam (roughly one car length behind ego)
     : [0, cameraConfig.height, 0]; 
     
   const cameraRot: [number, number, number] = threeViewMode === 'SIMULATED'
-    ? [-0.45, 0, 0] // Slightly steeper tilt to keep the ground dominant
+    ? [-0.4, 0, 0] // Tilted to keep ego car at bottom and horizon in view
     : [cameraConfig.pitch, 0, 0]; 
 
-  const cameraFov = threeViewMode === 'SIMULATED' ? 65 : cameraConfig.fov;
+  const cameraFov = threeViewMode === 'SIMULATED' ? 75 : cameraConfig.fov;
 
   return (
     <View style={styles.container}>
