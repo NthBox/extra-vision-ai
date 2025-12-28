@@ -1,4 +1,6 @@
 import 'dotenv/config';
+const withMLModel = require('./plugins/withMLModel');
+const withDetectObjects = require('./plugins/withDetectObjects');
 
 export default ({ config }) => ({
   ...config,
@@ -12,14 +14,20 @@ export default ({ config }) => ({
   plugins: [
     "@config-plugins/react-native-webrtc",
     "expo-asset",
-    "vision-camera-resize-plugin",
     [
       "react-native-vision-camera",
       {
         "cameraPermissionText": "This app uses the camera for real-time vision processing.",
         "enableFrameProcessors": true
       }
-    ]
+    ],
+    [
+      withMLModel,
+      {
+        modelPath: "assets/models/yolov10n.mlmodel"
+      }
+    ],
+    withDetectObjects
   ],
   splash: {
     image: "./assets/splash-icon.png",
