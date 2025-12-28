@@ -128,6 +128,7 @@ export const CameraScreen = () => {
               device={device}
               isActive={isPlaying}
               frameProcessor={frameProcessor}
+              pixelFormat="yuv"
             />
           )
         ) : isRealTimeEnabled ? (
@@ -147,7 +148,10 @@ export const CameraScreen = () => {
           <CameraView
             style={styles.camera}
             ref={cameraRef}
-            onCameraReady={() => setIsCameraReady(true)}
+            onCameraReady={() => {
+              console.log('[EVAI] Camera Ready');
+              setIsCameraReady(true);
+            }}
             responsiveOrientationWhenOrientationLocked
           />
         )}
@@ -200,7 +204,10 @@ export const CameraScreen = () => {
           <View style={styles.mainControls}>
             <TouchableOpacity 
               style={[styles.playButton, isPlaying ? styles.pauseButton : styles.startButton]} 
-              onPress={() => setIsPlaying(!isPlaying)}
+              onPress={() => {
+                console.log('[EVAI] PLAY/PAUSE toggled. New state:', !isPlaying);
+                setIsPlaying(!isPlaying);
+              }}
             >
               <Text style={styles.playButtonText}>{isPlaying ? 'PAUSE' : 'PLAY'}</Text>
             </TouchableOpacity>
@@ -214,7 +221,10 @@ export const CameraScreen = () => {
 
             <TouchableOpacity 
               style={[styles.iconButton, isLocalMode && styles.activeLocalButton]} 
-              onPress={() => setLocalMode(!isLocalMode)}
+              onPress={() => {
+                console.log('[EVAI] LOC toggled. New state:', !isLocalMode);
+                setLocalMode(!isLocalMode);
+              }}
             >
               <Text style={styles.iconButtonText}>LOC</Text>
             </TouchableOpacity>

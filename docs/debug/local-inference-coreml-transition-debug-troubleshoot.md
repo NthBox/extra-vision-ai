@@ -28,10 +28,34 @@ Transitioning from a cross-platform TFLite implementation to an iOS-native CoreM
 - **Label Mapping**: Centralizing COCO-to-App label mapping in the hook.
 - **Automated Linking (Expo Professional Way)**: Custom Expo Config Plugins for `.mlpackage` and native bridge files.
 - **Native Resizing**: Using `request.imageCropAndScaleOption = .scaleFill` in Swift for zero-copy resizing.
+- **Thread-Safe State Updates**: Using `Worklets.createRunOnJS` to update Zustand stores from the high-speed worklet thread.
+- **Manual Frame Throttling**: Bypassing broken `runAtTargetFps` by using `frame.timestamp % N` for deterministic FPS control.
+- **Singleton Model Pattern**: Using `static` shared variables in Swift and `global` persistence in Worklets to prevent massive memory leaks from multiple model instances.
+- **Direct Bundle Loading**: Loading `.mlmodelc` directly via URL to bypass Xcode auto-generation sync issues.
+- **Objective-C Macro Alignment**: Using `@objc(initWithProxy:withOptions:)` to resolve naming mismatches between Swift and the VisionCamera registration macro.
+
+## Debugging Session Log (Dec 28, 2025)
+### Issue: App crash on LOC + PLAY
+- **Symptoms**: Immediate crash or freeze when starting the local inference worklet.
+- **Debug Methods**:
+    -   Used `NSLog` instead of `print` for reliable physical device logging in macOS Console app.
+    -   Used Xcode Internal Console to catch `JSINativeException` (empty parentheses error).
+    -   Implemented a "Safe Mode" heartbeat in the worklet to isolate library vs. logic failures.
+- **Troubleshoot Methods**:
+    -   Identified `VisionCameraProxy.getFrameProcessorPlugin` was renamed to `initFrameProcessorPlugin` in v4.
+    -   Verified "Target Membership" and "Compile Sources" in Xcode for local `.swift` and `.m` files.
+    -   Analyzed memory crash (Code 11) using Xcode Debugger to identify singleton necessity.
+- **Approaches that Worked**:
+    -   Moved plugin lookup inside the worklet to avoid JS-thread `undefined` errors.
+    -   Fixed `babel.config.js` by removing redundant plugins that interfered with Worklet AST transformation.
+    -   Added `@objc` selector to Swift `init` to satisfy Objective-C macro expectations.
 
 ## Lessons Learned & Prevention
 - **Avoid JS Resizing**: For high-frequency frame processing, keep frame data in native memory as long as possible.
 - **Version Compatibility**: Check VisionCamera v4 peer dependencies (`worklets-core`) and Babel plugins early.
-- **Robust Config Plugins**: Use deterministic UUIDs and clear parent/child path relationships in `project.pbxproj` to avoid build system confusion.
-- **Project Name Fallbacks**: In Config Plugins, always provide fallbacks for project-related variables that might be undefined in certain environments.
-- **Metro Cache**: Clear cache (`--clear`) after ANY change to `babel.config.js` or `package.json` affecting transforms.
+- **Robust Config Plugins**: Use deterministic UUIDs and clear parent/child path relationships in `project.pbxproj`.
+- **Project Name Fallbacks**: In Config Plugins, provide fallbacks for project-related variables.
+- **Metro Cache**: Clear cache (`--clear`) after ANY change to `babel.config.js`.
+- **Memory Management**: AI models must be singletons. Never initialize native plugins or models inside a high-frequency loop without persistence.
+- **Native Linking**: Manual local files in Expo `ios/` folders often need explicit "Target Membership" checks if config plugins are out of sync with new React Native architectures.
+- **Macro Strictness**: Objective-C macros for Swift integration are extremely sensitive to naming labels (e.g., `withOptions`). Always use `@objc` labels to guarantee mapping.

@@ -2,11 +2,10 @@ import { useCallback } from 'react';
 import { useVisionStore, Detection } from '../store/useVisionStore';
 import { useFrameProcessor, VisionCameraProxy } from 'react-native-vision-camera';
 import { useResizePlugin } from 'vision-camera-resize-plugin';
-import { runAtTargetFps } from 'react-native-worklets-core';
+import { Worklets } from 'react-native-worklets-core';
 
 /**
  * COCO Class Mapping for Extra Vision AI
- * Pre-trained YOLOv10 (COCO) has 80 classes.
  */
 const COCO_LABEL_MAP: Record<string, string> = {
   'person': 'Pedestrian',
@@ -21,32 +20,59 @@ export const useLocalInference = () => {
   const { isLocalMode, setDetections } = useVisionStore();
   const { resize } = useResizePlugin();
 
+  // Create a thread-safe version of the store setter
+  const setDetectionsJS = Worklets.createRunOnJS(setDetections);
+
   const frameProcessor = useFrameProcessor((frame) => {
     'worklet';
     
     if (!isLocalMode) return;
+    
+    // PERSISTENT INITIALIZATION: Only run this once per session
+    if ((global as any)._detectObjectsPlugin == null) {
+      console.log('[EVAI] Initializing plugin singleton in worklet...');
+      (global as any)._detectObjectsPlugin = VisionCameraProxy.initFrameProcessorPlugin('detectObjects');
+    }
+    const plugin = (global as any)._detectObjectsPlugin;
 
-    // Retrieve plugin inside the worklet context
-    const plugin = VisionCameraProxy.getFrameProcessorPlugin('detectObjects');
-
-    runAtTargetFps(10, () => {
-      // 1. Pass the original frame directly to the native plugin.
-      // CoreML is much more efficient at handling the buffer and resizing internally.
-      if (plugin) {
-        const results = plugin.call(frame) as any[];
-        
-        if (results) {
-          const mappedDetections: Detection[] = results.map((det) => ({
-            bbox: [det.x, det.y, det.w, det.h],
-            label: COCO_LABEL_MAP[det.label] || det.label,
-            score: det.confidence,
-          }));
-
-          setDetections(mappedDetections);
-        }
+    // Defensive check
+    if (!plugin) {
+      if (frame.timestamp % 60 === 0) {
+        console.log('[EVAI] CRITICAL: "detectObjects" plugin not found in worklet');
       }
-    });
-  }, [isLocalMode]);
+      return;
+    }
+
+    // Diagnostic log: Check what VisionCameraProxy actually is
+    if (typeof (global as any)._evaiFirstFrame === 'undefined') {
+      console.log('[EVAI] Worklet started. VisionCameraProxy type:', typeof VisionCameraProxy);
+      (global as any)._evaiFirstFrame = true;
+    }
+
+    // Log once every 60 frames (approx 2 seconds at 30fps)
+    if (frame.timestamp % 60 === 0) {
+      console.log('[EVAI] Worklet Alive - Frames flowing');
+    }
+
+    // Manual Throttling: Run only every 3rd frame (~10 FPS)
+    if (Math.floor(frame.timestamp * 1000) % 3 !== 0) return;
+
+    try {
+      const results = plugin.call(frame) as any[];
+      
+      if (results && results.length > 0) {
+        const mappedDetections: Detection[] = results.map((det) => ({
+          bbox: [det.x, det.y, det.w, det.h],
+          label: COCO_LABEL_MAP[det.label] || det.label,
+          score: det.confidence,
+        }));
+
+        setDetectionsJS(mappedDetections);
+      }
+    } catch (e) {
+      console.log(`[EVAI] Local Inference Worklet Error: ${e}`);
+    }
+  }, [isLocalMode, setDetectionsJS]);
 
   return {
     frameProcessor,
