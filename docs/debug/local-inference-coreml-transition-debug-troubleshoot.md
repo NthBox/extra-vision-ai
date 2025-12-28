@@ -8,14 +8,16 @@ Transitioning from a cross-platform TFLite implementation to an iOS-native CoreM
 - **Dependency Audit**: Searched for compatible VisionCamera v4 plugins for CoreML. Identified that many older plugins (v2/v3) are incompatible with the new JSI/Worklet architecture of VisionCamera v4.
 - **Model Format Analysis**: Identified that newer CoreML exports often use `.mlpackage` (folder-based) instead of the legacy single-file `.mlmodel` format.
 - **Runtime Error Analysis**: Identified `TypeError: VisionCameraProxy.getFrameProcessorPlugin is not a function` which indicates that the native module was either not ready or the JS-to-Native bridge was broken by missing Babel configuration.
+- **Babel Plugin Errors**: Encountered `Cannot find module '@babel/plugin-proposal-optional-chaining'` and `@babel/plugin-transform-template-literals` during worklet transformation. This is a known issue where `react-native-worklets-core` may require specific plugins to be explicitly present in the project's `node_modules`.
 
 ## Troubleshooting Methods
 - **Plugin Search**: Tried several npm package variations (`vision-camera-v3-coreml`, `react-native-vision-camera-coreml`). Found that a manual Swift bridge is the most stable approach for v4.
 - **Preprocessing Optimization**: Identified that image resizing is a bottleneck. Resolved by integrating `vision-camera-resize-plugin` which uses GPU/Metal for scaling before passing to CoreML.
 - **Xcode Linking Issues**: Encountered `TypeError` during prebuild when linking folders as files. Resolved by setting `lastKnownFileType` to `wrapper.mlpackage` in the pbxproj manipulation logic.
 - **Header Not Found Error**: Encountered `'VisionCamera/Frame.h' file not found` during EAS build. This was traced back to missing `react-native-worklets-core`, which is a required peer dependency for VisionCamera v4 Frame Processors.
-- **Babel Configuration**: Created `babel.config.js` with `react-native-worklets-core/plugin`. This is **required** for VisionCamera v4 to properly compile worklets and provide access to the `VisionCameraProxy`.
+- **Babel Configuration**: Created `babel.config.js` with `react-native-worklets-core/plugin`.
 - **Lazy Plugin Initialization**: Moved `VisionCameraProxy.getFrameProcessorPlugin` from top-level to inside the `useFrameProcessor` worklet context to ensure it is called when the native environment is ready.
+- **Explicit Babel Plugins**: Manually installed legacy proposal and transform plugins (like `optional-chaining` and `template-literals`) to satisfy the requirements of the `react-native-worklets-core` transformer which sometimes fails to find them within nested presets.
 
 ## Approaches That Worked
 - **Hybrid Native Bridge**: Using the `vision-camera-resize-plugin` in the JS worklet and defining a clear Swift interface for the CoreML prediction.
@@ -29,3 +31,4 @@ Transitioning from a cross-platform TFLite implementation to an iOS-native CoreM
 - **Version Compatibility**: Always verify VisionCamera plugin compatibility with the current major version (v4) and its JSI/Worklet requirements before starting implementation.
 - **Mandatory Babel Plugins**: Any project using `react-native-worklets-core` (VisionCamera v4) **must** have the corresponding plugin in `babel.config.js`.
 - **Lazy Proxy Access**: Avoid accessing native proxies (`VisionCameraProxy`) at the module top-level; always access them within the context of a hook or worklet.
+- **Fragile Babel Environment**: Worklet transformers are sensitive to the presence of specific Babel plugins in the project root. If a transform error occurs, manually installing the missing `@babel/plugin-` often resolves it.
