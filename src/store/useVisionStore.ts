@@ -53,6 +53,7 @@ interface VisionState {
   visualizationMode: 'CAMERA' | '3D';
   threeViewMode: 'REAL' | 'SIMULATED';
   modelMode: 'FAST' | 'ACCURATE'; // FAST = YOLO, ACCURATE = SAM3
+  isEnhancedMode: boolean; // Twilio TURN relay mode
   
   // Camera Model fields
   cameraConfig: CameraConfig;
@@ -69,6 +70,7 @@ interface VisionState {
   setVisualizationMode: (mode: 'CAMERA' | '3D') => void;
   setThreeViewMode: (mode: 'REAL' | 'SIMULATED') => void;
   setModelMode: (mode: 'FAST' | 'ACCURATE') => void;
+  setEnhancedMode: (enabled: boolean) => void;
   
   // Camera Model setters
   updateCameraConfig: (config: Partial<CameraConfig>) => void;
@@ -87,6 +89,7 @@ export const useVisionStore = create<VisionState>((set) => ({
   visualizationMode: 'CAMERA',
   threeViewMode: 'SIMULATED',
   modelMode: 'FAST',
+  isEnhancedMode: false,
   cameraConfig: CAMERA_PRESETS.WIDE,
 
   setDetections: (detections) => set({ detections }),
@@ -100,6 +103,7 @@ export const useVisionStore = create<VisionState>((set) => ({
   setVisualizationMode: (visualizationMode) => set({ visualizationMode }),
   setThreeViewMode: (threeViewMode) => set({ threeViewMode }),
   setModelMode: (modelMode) => set({ modelMode }),
+  setEnhancedMode: (isEnhancedMode) => set({ isEnhancedMode }),
   
   updateCameraConfig: (config) => set((state) => ({ 
     cameraConfig: { ...state.cameraConfig, ...config } 

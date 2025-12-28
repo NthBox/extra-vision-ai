@@ -2,6 +2,8 @@ export interface Env {
   ROBOFLOW_API_KEY: string;
   ROBOFLOW_WORKSPACE: string;
   ROBOFLOW_WORKFLOW_ID: string;
+  TWILIO_ACCOUNT_SID: string;
+  TWILIO_AUTH_TOKEN: string;
 }
 
 export default {
@@ -22,6 +24,54 @@ export default {
     }
 
     // 2. WebRTC TURN Configuration
+    if (pathname === "/v1/webrtc-turn-config/twilio") {
+      try {
+        const auth = btoa(`${env.TWILIO_ACCOUNT_SID}:${env.TWILIO_AUTH_TOKEN}`);
+        const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${env.TWILIO_ACCOUNT_SID}/Tokens.json`;
+        
+        const response = await fetch(twilioUrl, {
+          method: "POST",
+          headers: {
+            "Authorization": `Basic ${auth}`
+          }
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Twilio API error: ${response.status} ${errorText}`);
+        }
+
+        const data = await response.json() as any;
+        
+        // Transform Twilio's ice_servers to standard WebRTC iceServers
+        // Twilio returns: { ice_servers: [{ urls, username, credential }, ...] }
+        const iceServers = data.ice_servers || [];
+        
+        return new Response(JSON.stringify({ iceServers }), {
+          headers: { 
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*" 
+          },
+        });
+      } catch (error: any) {
+        console.error('[Proxy] Twilio TURN error:', error.message);
+        return new Response(JSON.stringify({ 
+          error: "Failed to fetch Twilio TURN config",
+          details: error.message,
+          iceServers: [
+            { urls: ["stun:stun.l.google.com:19302"] },
+            { urls: ["stun:stun1.l.google.com:19302"] }
+          ]
+        }), {
+          status: 200, // Return 200 with fallback STUN to keep frontend working
+          headers: { 
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*" 
+          },
+        });
+      }
+    }
+
     if (pathname === "/v1/webrtc-turn-config") {
       try {
         const roboflowUrl = `https://api.roboflow.com/webrtc_turn_config?api_key=${env.ROBOFLOW_API_KEY}`;

@@ -15,6 +15,7 @@ export const useRealTimeInference = () => {
     isRealTimeEnabled, 
     isPlaying,
     modelMode,
+    isEnhancedMode,
     setDetections, 
     setStreaming, 
     setStreamingError,
@@ -65,8 +66,12 @@ export const useRealTimeInference = () => {
       // Update image dimensions from stream if possible
       setImageDimensions(640, 480);
 
+      const turnConfigUrl = isEnhancedMode 
+        ? `${INFERENCE_WORKER_URL}/v1/webrtc-turn-config/twilio`
+        : `${INFERENCE_WORKER_URL}/v1/webrtc-turn-config`;
+
       const connector = connectors.withProxyUrl(`${INFERENCE_WORKER_URL}/v1/stream/init`, {
-        turnConfigUrl: `${INFERENCE_WORKER_URL}/v1/webrtc-turn-config`
+        turnConfigUrl
       });
 
       const session = await webrtc.useStream({
@@ -74,7 +79,8 @@ export const useRealTimeInference = () => {
         connector,
         wrtcParams: {
           // Use the separate realtime workflow for FAST mode to avoid SAM3 compatibility issues
-          workflowId: modelMode === 'FAST' ? 'extra-vision-ai-realtime' : 'extra-vision-ai',
+          // Pin to realtime workflow if in enhanced mode
+          workflowId: (modelMode === 'FAST' || isEnhancedMode) ? 'extra-vision-ai-realtime' : 'extra-vision-ai',
           // Use the appropriate output based on modelMode
           // In the realtime workflow, YOLO results are in "predictions"
           // In the main workflow, SAM3 results are in "predictions"
@@ -82,13 +88,14 @@ export const useRealTimeInference = () => {
           // We don't need a video stream output from the server
           streamOutputNames: [],
           // Help ICE connection by being explicit with STUN servers
+          // These are ignored if turnConfigUrl returns a valid list, but good as backup
           iceServers: [
             { urls: ["stun:stun.l.google.com:19302"] },
             { urls: ["stun:stun1.l.google.com:19302"] },
             { urls: ["stun:stun2.l.google.com:19302"] },
             { urls: ["stun:stun.cloudflare.com:3478"] }
           ],
-          requestedPlan: 'webrtc-gpu-large',
+          requestedPlan: isEnhancedMode ? 'webrtc-gpu-medium' : 'webrtc-gpu-large',
           requestedRegion: 'us',
           realtimeProcessing: true
         },
@@ -213,7 +220,7 @@ export const useRealTimeInference = () => {
     return () => {
       stopStreaming();
     };
-  }, [isRealTimeEnabled, isPlaying, startStreaming, stopStreaming]);
+  }, [isRealTimeEnabled, isPlaying, isEnhancedMode, startStreaming, stopStreaming]);
 
   return {
     stream: streamRef.current

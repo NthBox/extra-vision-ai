@@ -29,6 +29,8 @@ export const CameraScreen = () => {
     setThreeViewMode,
     modelMode,
     setModelMode,
+    isEnhancedMode,
+    setEnhancedMode,
     cameraConfig,
     updateCameraConfig
   } = useVisionStore();
@@ -195,6 +197,13 @@ export const CameraScreen = () => {
             </TouchableOpacity>
 
             <TouchableOpacity 
+              style={[styles.iconButton, isEnhancedMode && styles.activeEnhancedButton]} 
+              onPress={() => setEnhancedMode(!isEnhancedMode)}
+            >
+              <Text style={styles.iconButtonText}>ENH</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
               style={[styles.iconButton, modelMode === 'ACCURATE' && styles.activeIconButton]} 
               onPress={() => setModelMode(modelMode === 'FAST' ? 'ACCURATE' : 'FAST')}
             >
@@ -297,6 +306,9 @@ const styles = StyleSheet.create({
   },
   activeIconButton: {
     backgroundColor: '#007AFF',
+  },
+  activeEnhancedButton: {
+    backgroundColor: '#FFCC00',
   },
   iconButtonText: {
     color: '#fff',
