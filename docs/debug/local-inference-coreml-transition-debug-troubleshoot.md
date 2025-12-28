@@ -13,6 +13,8 @@ Transitioning from a cross-platform TFLite implementation to an iOS-native CoreM
 - **Preprocessing Optimization**: Identified that image resizing is a bottleneck. Resolved by integrating `vision-camera-resize-plugin` which uses GPU/Metal for scaling before passing to CoreML.
 - **Xcode Linking Issues**: Encountered `TypeError` during prebuild when linking folders as files. Resolved by setting `lastKnownFileType` to `wrapper.mlpackage` in the pbxproj manipulation logic.
 - **Header Not Found Error**: Encountered `'VisionCamera/Frame.h' file not found` during EAS build. This was traced back to missing `react-native-worklets-core`, which is a required peer dependency for VisionCamera v4 Frame Processors.
+- **Zombie Reference Removal**: Fixed persistent "Build input file cannot be found" errors by aggressively purging existing `PBXFileReference` and `PBXBuildFile` entries for the model from the `project.pbxproj` before adding fresh ones.
+- **Deterministic UUIDs**: Switched to using stable, manually managed UUIDs for the model file and build file references within the config plugin to ensure perfect linkage between the file reference and the resources build phase.
 
 ## Approaches That Worked
 - **Hybrid Native Bridge**: Using the `vision-camera-resize-plugin` in the JS worklet and defining a clear Swift interface for the CoreML prediction.
@@ -20,6 +22,7 @@ Transitioning from a cross-platform TFLite implementation to an iOS-native CoreM
 - **Automated Linking (Expo Professional Way)**: Implemented a custom Expo Config Plugin (`plugins/withMLModel.js`) to automatically inject the `.mlmodel` or `.mlpackage` file into the Xcode project during the `prebuild` phase.
 - **Support for .mlpackage**: Updated the plugin to correctly handle the `.mlpackage` folder format by setting the `lastKnownFileType` to `wrapper.mlpackage`, allowing Xcode to treat the directory as a single compiled model bundle.
 - **EAS-Ready Native Bridge**: Moved native source files to `src/native/ios` and updated `plugins/withDetectObjects.js` to handle file copying during the ephemeral `prebuild` stage on EAS servers.
+- **Relative Native Pathing**: Forced the model reference path to `ExtraVisionAI/yolov10n.mlpackage` to match the physical copy location, resolving pathing mismatches in the generated `pbxproj`.
 
 ## Lessons Learned & Prevention
 - **Hardware-Specific Optimizations**: For real-time mobile AI, cross-platform wrappers (like TFLite) should be secondary to native frameworks (CoreML/NNAPI) when performance and thermals are critical.

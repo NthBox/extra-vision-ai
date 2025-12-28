@@ -11,6 +11,7 @@ public class DetectObjectsPlugin: FrameProcessorPlugin {
     
     do {
       let configuration = MLModelConfiguration()
+      // Xcode generates the class name based on the physical filename (.mlpackage name)
       let model = try yolov10n(configuration: configuration).model
       _model = try VNCoreMLModel(for: model)
     } catch {
