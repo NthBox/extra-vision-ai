@@ -1,15 +1,15 @@
 # Implementation Tasks: WebRTC Twilio TURN Integration
 
 ## Phase 1: Infrastructure & Backend
-- [ ] **Task 1: Twilio Setup**
-    - Obtain Twilio SID and Auth Token.
+- [x] **Task 1: Twilio Setup**
+    - Obtain Twilio Account SID, API Key SID, and API Key Secret.
     - Configure Twilio Network Traversal Service.
-- [ ] **Task 2: Cloudflare Worker Update**
+- [x] **Task 2: Cloudflare Worker Update**
     - Update `proxy/index.ts` `Env` interface.
     - Implement `/v1/webrtc-turn-config/twilio` endpoint with credential fetching logic.
     - Add CORS headers to the new endpoint.
 - [ ] **Task 3: Secret Deployment**
-    - Use `wrangler secret put` to add `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` to the worker.
+    - Use `wrangler secret put` to add `TWILIO_ACCOUNT_SID`, `TWILIO_API_KEY_SID`, and `TWILIO_API_KEY_SECRET` to the worker.
 
 ## Phase 2: Store & State
 - [ ] **Task 4: Vision Store Update**

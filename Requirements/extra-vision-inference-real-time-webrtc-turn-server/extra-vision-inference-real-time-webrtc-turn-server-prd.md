@@ -11,7 +11,7 @@ The current WebRTC implementation relies on STUN for peer-to-peer hole punching.
 ### 3.1. Proxy (Cloudflare Worker)
 - **Path**: `proxy/index.ts`
 - **Updates**:
-    - Add `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` to the `Env` interface.
+    - Add `TWILIO_ACCOUNT_SID`, `TWILIO_API_KEY_SID`, and `TWILIO_API_KEY_SECRET` to the `Env` interface.
     - Implement a new route: `GET /v1/webrtc-turn-config/twilio`.
     - Logic: Call Twilio's Network Traversal Service API to get ephemeral `iceServers`.
     - Return the `iceServers` array in the standard WebRTC format.

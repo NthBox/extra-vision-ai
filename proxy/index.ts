@@ -3,7 +3,8 @@ export interface Env {
   ROBOFLOW_WORKSPACE: string;
   ROBOFLOW_WORKFLOW_ID: string;
   TWILIO_ACCOUNT_SID: string;
-  TWILIO_AUTH_TOKEN: string;
+  TWILIO_API_KEY_SID: string;
+  TWILIO_API_KEY_SECRET: string;
 }
 
 export default {
@@ -26,7 +27,7 @@ export default {
     // 2. WebRTC TURN Configuration
     if (pathname === "/v1/webrtc-turn-config/twilio") {
       try {
-        const auth = btoa(`${env.TWILIO_ACCOUNT_SID}:${env.TWILIO_AUTH_TOKEN}`);
+        const auth = btoa(`${env.TWILIO_API_KEY_SID}:${env.TWILIO_API_KEY_SECRET}`);
         const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${env.TWILIO_ACCOUNT_SID}/Tokens.json`;
         
         const response = await fetch(twilioUrl, {

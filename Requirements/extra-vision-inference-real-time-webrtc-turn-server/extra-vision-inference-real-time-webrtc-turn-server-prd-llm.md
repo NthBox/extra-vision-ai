@@ -19,7 +19,7 @@ The standard WebRTC peer-to-peer connection used for real-time inference often f
 
 ## 4. Implementation Scope
 - **Backend (Cloudflare Worker)**:
-  - Add Twilio secrets (`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`).
+  - Add Twilio secrets (`TWILIO_ACCOUNT_SID`, `TWILIO_API_KEY_SID`, `TWILIO_API_KEY_SECRET`).
   - Create `/v1/webrtc-turn-config/twilio` endpoint to return ephemeral TURN servers.
 - **Store (Zustand)**:
   - Add `isEnhancedModeEnabled` to `useVisionStore`.

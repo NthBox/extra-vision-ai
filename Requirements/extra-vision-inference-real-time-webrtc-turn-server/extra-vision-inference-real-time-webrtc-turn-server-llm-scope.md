@@ -43,7 +43,7 @@ Based on `webrtc-gpu-medium` ($0.067/min) + Twilio TURN ($0.006/min):
 
 ## 6. Implementation Checklist
 - [ ] Sign up for Twilio Network Traversal and obtain SID/Auth Token.
-- [ ] Add `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` to Cloudflare Worker secrets.
+- [ ] Add `TWILIO_ACCOUNT_SID`, `TWILIO_API_KEY_SID`, and `TWILIO_API_KEY_SECRET` to Cloudflare Worker secrets.
 - [ ] Create `/v1/webrtc-turn-config/twilio` endpoint in `proxy/index.ts`.
 - [ ] Update `useRealTimeInference.ts` to support the new `webrtc-gpu-medium` plan and Twilio ICE servers.
 - [ ] Add the "Enhanced" button to `CameraScreen.tsx`.
