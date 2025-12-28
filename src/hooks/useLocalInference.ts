@@ -17,18 +17,35 @@ const COCO_LABEL_MAP: Record<string, string> = {
 };
 
 export const useLocalInference = () => {
-  const { isLocalMode, setDetections } = useVisionStore();
+  const { isLocalMode, setDetections, setImageDimensions } = useVisionStore();
   const { resize } = useResizePlugin();
 
-  // Create a thread-safe version of the store setter
+  // Create thread-safe versions of store setters
   const setDetectionsJS = Worklets.createRunOnJS(setDetections);
+  const setImageDimensionsJS = Worklets.createRunOnJS(setImageDimensions);
 
   const frameProcessor = useFrameProcessor((frame) => {
     'worklet';
     
     if (!isLocalMode) return;
     
-    // PERSISTENT INITIALIZATION: Only run this once per session
+    // 1. Initialize and increment Frame Counter
+    if ((global as any)._evaiCounter === undefined) (global as any)._evaiCounter = 0;
+    (global as any)._evaiCounter++;
+
+    // 2. Heartbeat Log (Every 1 second / 30 frames)
+    if ((global as any)._evaiCounter % 30 === 0) {
+      console.log(`[EVAI] Worklet Heartbeat - Frame: ${(global as any)._evaiCounter}`);
+    }
+
+    // 3. Update Dimensions (only on change or first frame) to ensure scaling is correct
+    if ((global as any)._lastW !== frame.width || (global as any)._lastH !== frame.height) {
+      setImageDimensionsJS(frame.width, frame.height);
+      (global as any)._lastW = frame.width;
+      (global as any)._lastH = frame.height;
+    }
+    
+    // 4. PERSISTENT INITIALIZATION: Only run this once per session
     if ((global as any)._detectObjectsPlugin == null) {
       console.log('[EVAI] Initializing plugin singleton in worklet...');
       (global as any)._detectObjectsPlugin = VisionCameraProxy.initFrameProcessorPlugin('detectObjects');
@@ -37,42 +54,52 @@ export const useLocalInference = () => {
 
     // Defensive check
     if (!plugin) {
-      if (frame.timestamp % 60 === 0) {
+      if ((global as any)._evaiCounter % 60 === 0) {
         console.log('[EVAI] CRITICAL: "detectObjects" plugin not found in worklet');
       }
       return;
     }
 
-    // Diagnostic log: Check what VisionCameraProxy actually is
-    if (typeof (global as any)._evaiFirstFrame === 'undefined') {
-      console.log('[EVAI] Worklet started. VisionCameraProxy type:', typeof VisionCameraProxy);
-      (global as any)._evaiFirstFrame = true;
-    }
-
-    // Log once every 60 frames (approx 2 seconds at 30fps)
-    if (frame.timestamp % 60 === 0) {
-      console.log('[EVAI] Worklet Alive - Frames flowing');
-    }
-
-    // Manual Throttling: Run only every 3rd frame (~10 FPS)
-    if (Math.floor(frame.timestamp * 1000) % 3 !== 0) return;
+    // 5. Throttling: Run inference every 3rd frame (~10 FPS)
+    if ((global as any)._evaiCounter % 3 !== 0) return;
 
     try {
       const results = plugin.call(frame) as any[];
       
       if (results && results.length > 0) {
-        const mappedDetections: Detection[] = results.map((det) => ({
-          bbox: [det.x, det.y, det.w, det.h],
-          label: COCO_LABEL_MAP[det.label] || det.label,
-          score: det.confidence,
-        }));
+        // Aggressive logging: show every detection until we confirm it works
+        console.log(`[EVAI] SUCCESS! Detected ${results.length} objects`);
+        
+        const mappedDetections: Detection[] = results.map((det, index) => {
+          // Convert normalized (0-1) coordinates to pixel coordinates
+          const x = det.x * frame.width;
+          const y = det.y * frame.height;
+          const w = det.w * frame.width;
+          const h = det.h * frame.height;
+
+          // Log the first box's coordinates every 2 seconds
+          if (index === 0 && (global as any)._evaiCounter % 60 === 0) {
+            console.log(`[EVAI] Box 0 - Normalized: [${det.x.toFixed(2)}, ${det.y.toFixed(2)}], Pixels: [${x.toFixed(0)}, ${y.toFixed(0)}]`);
+          }
+
+          return {
+            bbox: [x, y, w, h],
+            label: COCO_LABEL_MAP[det.label] || det.label,
+            score: det.confidence,
+          };
+        });
 
         setDetectionsJS(mappedDetections);
+      } else {
+        // Log even if nothing is detected, but only once a second
+        if ((global as any)._evaiCounter % 30 === 0) {
+          console.log('[EVAI] Plugin called - 0 objects found');
+        }
       }
     } catch (e) {
       console.log(`[EVAI] Local Inference Worklet Error: ${e}`);
     }
-  }, [isLocalMode, setDetectionsJS]);
+  }, [isLocalMode, setDetectionsJS, setImageDimensionsJS]);
 
   return {
     frameProcessor,

@@ -50,7 +50,25 @@ Transitioning from a cross-platform TFLite implementation to an iOS-native CoreM
     -   Fixed `babel.config.js` by removing redundant plugins that interfered with Worklet AST transformation.
     -   Added `@objc` selector to Swift `init` to satisfy Objective-C macro expectations.
 
+### Issue: Detections working but bounding boxes invisible
+- **Symptoms**: Logs showed "SUCCESS! Detected X objects" but the UI remained empty.
+- **Debug Methods**:
+    -   Added `VNCoreMLFeatureValueObservation` type logging to catch raw tensor outputs.
+    -   Logged `multiArray.shape` to identify the exact YOLO output format.
+    -   Logged raw pixel values from Swift (`First Det - ...`) and scaled values from JS (`Box 0 - ...`).
+- **Troubleshoot Methods**:
+    -   Identified model was outputting raw pixels on a `640x640` grid instead of normalized 0-1 values.
+    -   Discovered output shape was `[1, 300, 6]` (batch, boxes, features) instead of `[1, 6, 300]`.
+    -   Mapped features correctly: `0:x_min, 1:y_min, 2:x_max, 3:y_max, 4:conf, 5:class`.
+- **Approaches that Worked**:
+    -   Implemented a "Dual Parser" in Swift to handle both high-level `VNRecognizedObjectObservation` and raw `VNCoreMLFeatureValueObservation`.
+    -   Normalized coordinates in Swift by dividing by `640.0` before passing to JS.
+    -   Converted `[x1, y1, x2, y2]` (max-based) to `[x, y, w, h]` (width/height-based) for standard UI rendering.
+
 ## Lessons Learned & Prevention
+- **Model Output Variety**: YOLO exports to CoreML are inconsistent. Always log the `request.results` type and `multiArray.shape` during initial integration.
+- **Pixel vs Normalized**: Never assume CoreML output is normalized. If values are > 1.0, they are likely grid-relative pixels (usually 640 or 320).
+- **Indexing Sensitivity**: Batch/Box/Feature order varies by YOLO version and export tool. Verify indexing with a known reference image.
 - **Avoid JS Resizing**: For high-frequency frame processing, keep frame data in native memory as long as possible.
 - **Version Compatibility**: Check VisionCamera v4 peer dependencies (`worklets-core`) and Babel plugins early.
 - **Robust Config Plugins**: Use deterministic UUIDs and clear parent/child path relationships in `project.pbxproj`.

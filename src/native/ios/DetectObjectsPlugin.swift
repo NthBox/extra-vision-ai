@@ -31,7 +31,7 @@ public class DetectObjectsPlugin: FrameProcessorPlugin {
     NSLog("[EVAI] DetectObjectsPlugin instance created.")
   }
 
-  public override func callback(_ frame: Frame, withArguments arguments: [AnyHashable: Any]?) -> Any? {
+  public override func callback(_ frame: Frame, withArguments arguments: [AnyHashable : Any]?) -> Any? {
     // Use the shared static model
     guard let model = DetectObjectsPlugin._sharedModel else { return nil }
     
@@ -50,20 +50,60 @@ public class DetectObjectsPlugin: FrameProcessorPlugin {
       return nil
     }
 
-    guard let results = request.results as? [VNRecognizedObjectObservation] else {
-      return nil
+    guard let allResults = request.results else { return [] }
+
+    // 1. Handle "Recognized Object" models (High-level / Wrapped)
+    if let results = allResults as? [VNRecognizedObjectObservation] {
+        return results.map { observation in
+            let bounds = observation.boundingBox
+            return [
+                "label": observation.labels.first?.identifier ?? "unknown",
+                "confidence": observation.confidence,
+                "x": bounds.origin.x,
+                "y": 1.0 - Double(bounds.origin.y) - Double(bounds.size.height),
+                "w": bounds.size.width,
+                "h": bounds.size.height
+            ]
+        }
     }
 
-    return results.map { observation in
-      let bounds = observation.boundingBox
-      return [
-        "label": observation.labels.first?.identifier ?? "unknown",
-        "confidence": observation.confidence,
-        "x": bounds.origin.x,
-        "y": 1.0 - Double(bounds.origin.y) - Double(bounds.size.height),
-        "w": bounds.size.width,
-        "h": bounds.size.height
-      ]
+    // 2. Handle "Feature Value" models (Raw YOLO output / MultiArray)
+    if let firstResult = allResults.first as? VNCoreMLFeatureValueObservation,
+       let multiArray = firstResult.featureValue.multiArrayValue {
+        
+        var detections: [[String: Any]] = []
+        
+        // Handling [1, 300, 6] shape: [batch, box_index, feature_index]
+        // features: 0:x_min, 1:y_min, 2:x_max, 3:y_max, 4:conf, 5:class
+        // These are in 640x640 pixel space
+        let shape = multiArray.shape
+        if shape.count >= 3 {
+            let numBoxes = shape[1].intValue
+            
+            for i in 0..<min(numBoxes, 100) {
+                let conf = multiArray[ [0, i, 4] as [NSNumber] ].doubleValue
+                
+                if conf > 0.25 {
+                    let x1 = multiArray[ [0, i, 0] as [NSNumber] ].doubleValue
+                    let y1 = multiArray[ [0, i, 1] as [NSNumber] ].doubleValue
+                    let x2 = multiArray[ [0, i, 2] as [NSNumber] ].doubleValue
+                    let y2 = multiArray[ [0, i, 3] as [NSNumber] ].doubleValue
+                    
+                    // Normalize to 0.0 - 1.0 range based on 640x640 model input
+                    detections.append([
+                        "label": "object", 
+                        "confidence": conf,
+                        "x": x1 / 640.0,
+                        "y": y1 / 640.0,
+                        "w": (x2 - x1) / 640.0,
+                        "h": (y2 - y1) / 640.0
+                    ])
+                }
+            }
+        }
+        return detections
     }
+
+    return []
   }
 }
