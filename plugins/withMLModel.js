@@ -10,13 +10,12 @@ const withMLModel = (config, { modelPath }) => {
     const { projectRoot } = config.modRequest;
     const xcodeProject = config.modResults;
     
-    // Robustly find the project name/target name
-    const projectName = config.modRequest.projectName || config.name || 'ExtraVisionAI';
+    // Explicitly use ExtraVisionAI as it's the known project folder name
+    const projectName = 'ExtraVisionAI';
 
     const absoluteSrcPath = path.resolve(projectRoot, modelPath);
     const modelFileName = path.basename(modelPath);
     
-    // Physical destination: ios/<ProjectName>/<ModelFile>
     const destPath = path.join(projectRoot, 'ios', projectName, modelFileName);
 
     if (!fs.existsSync(absoluteSrcPath)) {
@@ -24,18 +23,19 @@ const withMLModel = (config, { modelPath }) => {
       return config;
     }
 
-    // 1. Copy the model to the native project folder
+    // 1. Copy the model
     fs.ensureDirSync(path.dirname(destPath));
     if (fs.existsSync(destPath)) fs.removeSync(destPath);
     fs.copySync(absoluteSrcPath, destPath);
 
-    // 2. Setup Group (Purely logical)
+    // 2. Setup Group
     const groupName = 'Models';
-    let group = xcodeProject.pbxGroupByName(groupName);
-    if (!group) {
+    let groupKey = xcodeProject.findPBXGroupKey({ name: groupName });
+    if (!groupKey) {
       const mainGroupKey = xcodeProject.getFirstProject().firstProject.mainGroup;
-      group = xcodeProject.addPbxGroup([], groupName, null);
-      xcodeProject.addToPbxGroup(group.uuid, mainGroupKey);
+      const group = xcodeProject.addPbxGroup([], groupName, projectName); 
+      groupKey = group.uuid;
+      xcodeProject.addToPbxGroup(groupKey, mainGroupKey);
     }
 
     // 3. PURGE ALL TRACES
@@ -53,18 +53,15 @@ const withMLModel = (config, { modelPath }) => {
       }
     });
 
-    // 4. ADD FRESH
-    const frUUID = 'EVAI_MODEL_REF_UUID';
-    const bfUUID = 'EVAI_MODEL_BUILD_UUID';
+    // 4. ADD FRESH DETERMINISTIC
+    const frUUID = 'EVAI_MODEL_REF_UUID_0001';
+    const bfUUID = 'EVAI_MODEL_BLD_UUID_0001';
     
-    // In PBXFileReference, 'path' should be relative to the source tree.
-    // If sourceTree is "<group>", and the group is the main group (root of the project),
-    // then path should be "ProjectName/ModelName"
     objects.PBXFileReference[frUUID] = {
       isa: 'PBXFileReference',
       lastKnownFileType: 'wrapper.mlpackage',
       name: modelFileName,
-      path: `"${projectName}/${modelFileName}"`,
+      path: modelFileName,
       sourceTree: '"<group>"'
     };
 
@@ -74,13 +71,14 @@ const withMLModel = (config, { modelPath }) => {
       fileRef_comment: modelFileName
     };
 
-    // Link to group
-    if (group.children) {
-      group.children = group.children.filter(c => c.comment !== modelFileName);
-      group.children.push({ value: frUUID, comment: modelFileName });
+    // Manual link to group
+    const groupObj = objects.PBXGroup[groupKey];
+    if (groupObj && groupObj.children) {
+      groupObj.children = groupObj.children.filter(c => c.comment !== modelFileName);
+      groupObj.children.push({ value: frUUID, comment: modelFileName });
     }
 
-    // Link to Resources phase of the MAIN target
+    // Manual link to Resources phase
     const targetUuid = xcodeProject.getFirstTarget().uuid;
     const resourcesPhase = xcodeProject.pbxResourcesBuildPhaseObj(targetUuid);
     if (resourcesPhase && resourcesPhase.files) {

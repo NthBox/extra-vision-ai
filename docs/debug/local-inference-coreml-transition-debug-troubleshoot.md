@@ -16,8 +16,8 @@ Transitioning from a cross-platform TFLite implementation to an iOS-native CoreM
 - **Preprocessing Optimization**: Moved resizing from JS to Native (Swift) using optimized `VNCoreMLRequest` scaling.
 - **Xcode Linking Issues**: Resolved `Build input file cannot be found` errors by:
     1.  Aggressively purging stale references in `project.pbxproj`.
-    2.  Using deterministic UUIDs (`EVAI_MODEL_REF_UUID`).
-    3.  Robustly resolving `projectName` in Config Plugins to avoid `null` paths.
+    2.  Using deterministic 24-char hex UUIDs (`EVAI_MODEL_REF_UUID_0001`).
+    3.  Structuring group paths correctly: Group `Models` with `path = ExtraVisionAI` and child with `path = yolov10n.mlpackage`. This avoids `null` or mangled paths.
 - **Header Not Found Error**: Trace back to missing `react-native-worklets-core`.
 - **Babel Configuration**: Created `babel.config.js` with `react-native-worklets-core/plugin` and required legacy proposal plugins.
 - **Lazy Plugin Initialization**: Moved `VisionCameraProxy.getFrameProcessorPlugin` inside the `useFrameProcessor` worklet context.
@@ -31,5 +31,5 @@ Transitioning from a cross-platform TFLite implementation to an iOS-native CoreM
 ## Lessons Learned & Prevention
 - **Avoid JS Resizing**: For high-frequency frame processing, keep frame data in native memory as long as possible.
 - **Version Compatibility**: Check VisionCamera v4 peer dependencies (`worklets-core`) and Babel plugins early.
-- **Robust Config Plugins**: Always provide fallbacks for `projectName` and other `modRequest` variables in Expo config plugins.
+- **Robust Config Plugins**: Use deterministic UUIDs and clear parent/child path relationships in `project.pbxproj` to avoid build system confusion.
 - **Metro Cache**: Clear cache (`--clear`) after ANY change to `babel.config.js` or `package.json` affecting transforms.
