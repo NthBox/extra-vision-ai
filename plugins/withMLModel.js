@@ -9,12 +9,14 @@ const withMLModel = (config, { modelPath }) => {
   return withXcodeProject(config, (config) => {
     const { projectRoot } = config.modRequest;
     const xcodeProject = config.modResults;
-    const projectName = config.modRequest.projectName;
+    
+    // Robustly find the project name/target name
+    const projectName = config.modRequest.projectName || config.name || 'ExtraVisionAI';
 
     const absoluteSrcPath = path.resolve(projectRoot, modelPath);
     const modelFileName = path.basename(modelPath);
     
-    // Physical destination
+    // Physical destination: ios/<ProjectName>/<ModelFile>
     const destPath = path.join(projectRoot, 'ios', projectName, modelFileName);
 
     if (!fs.existsSync(absoluteSrcPath)) {
@@ -22,12 +24,12 @@ const withMLModel = (config, { modelPath }) => {
       return config;
     }
 
-    // 1. Copy the model
+    // 1. Copy the model to the native project folder
     fs.ensureDirSync(path.dirname(destPath));
     if (fs.existsSync(destPath)) fs.removeSync(destPath);
     fs.copySync(absoluteSrcPath, destPath);
 
-    // 2. Setup Group
+    // 2. Setup Group (Purely logical)
     const groupName = 'Models';
     let group = xcodeProject.pbxGroupByName(groupName);
     if (!group) {
@@ -36,7 +38,7 @@ const withMLModel = (config, { modelPath }) => {
       xcodeProject.addToPbxGroup(group.uuid, mainGroupKey);
     }
 
-    // 3. PURGE ALL TRACES of anything matching the model name
+    // 3. PURGE ALL TRACES
     const objects = xcodeProject.hash.project.objects;
     Object.keys(objects.PBXFileReference).forEach(key => {
       const fr = objects.PBXFileReference[key];
@@ -55,6 +57,9 @@ const withMLModel = (config, { modelPath }) => {
     const frUUID = 'EVAI_MODEL_REF_UUID';
     const bfUUID = 'EVAI_MODEL_BUILD_UUID';
     
+    // In PBXFileReference, 'path' should be relative to the source tree.
+    // If sourceTree is "<group>", and the group is the main group (root of the project),
+    // then path should be "ProjectName/ModelName"
     objects.PBXFileReference[frUUID] = {
       isa: 'PBXFileReference',
       lastKnownFileType: 'wrapper.mlpackage',

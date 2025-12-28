@@ -30,16 +30,10 @@ export const useLocalInference = () => {
     const plugin = VisionCameraProxy.getFrameProcessorPlugin('detectObjects');
 
     runAtTargetFps(10, () => {
-      // 1. Resize the frame
-      const resized = resize(frame, {
-        size: { width: 640, height: 640 },
-        pixelFormat: 'rgb',
-        dataType: 'uint8',
-      });
-
-      // 2. Run Inference
+      // 1. Pass the original frame directly to the native plugin.
+      // CoreML is much more efficient at handling the buffer and resizing internally.
       if (plugin) {
-        const results = plugin.call(resized) as any[];
+        const results = plugin.call(frame) as any[];
         
         if (results) {
           const mappedDetections: Detection[] = results.map((det) => ({
@@ -52,7 +46,7 @@ export const useLocalInference = () => {
         }
       }
     });
-  }, [isLocalMode, resize]);
+  }, [isLocalMode]);
 
   return {
     frameProcessor,
