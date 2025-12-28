@@ -18,6 +18,7 @@ Transitioning from a cross-platform TFLite implementation to an iOS-native CoreM
     1.  Aggressively purging stale references in `project.pbxproj`.
     2.  Using deterministic 24-char hex UUIDs (`EVAI_MODEL_REF_UUID_0001`).
     3.  Structuring group paths correctly: Group `Models` with `path = ExtraVisionAI` and child with `path = yolov10n.mlpackage`. This avoids `null` or mangled paths.
+- **Config Plugin Robustness**: Fixed a critical issue where `config.modRequest.projectName` was returning `null`, leading to invalid paths. Implemented fallback to the sanitized project name.
 - **Header Not Found Error**: Trace back to missing `react-native-worklets-core`.
 - **Babel Configuration**: Created `babel.config.js` with `react-native-worklets-core/plugin` and required legacy proposal plugins.
 - **Lazy Plugin Initialization**: Moved `VisionCameraProxy.getFrameProcessorPlugin` inside the `useFrameProcessor` worklet context.
@@ -32,4 +33,5 @@ Transitioning from a cross-platform TFLite implementation to an iOS-native CoreM
 - **Avoid JS Resizing**: For high-frequency frame processing, keep frame data in native memory as long as possible.
 - **Version Compatibility**: Check VisionCamera v4 peer dependencies (`worklets-core`) and Babel plugins early.
 - **Robust Config Plugins**: Use deterministic UUIDs and clear parent/child path relationships in `project.pbxproj` to avoid build system confusion.
+- **Project Name Fallbacks**: In Config Plugins, always provide fallbacks for project-related variables that might be undefined in certain environments.
 - **Metro Cache**: Clear cache (`--clear`) after ANY change to `babel.config.js` or `package.json` affecting transforms.
