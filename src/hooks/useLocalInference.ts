@@ -17,11 +17,6 @@ const COCO_LABEL_MAP: Record<string, string> = {
   'bicycle': 'Cyclist',
 };
 
-// This is a placeholder for the native Frame Processor Plugin.
-// In a real project, you would implement 'detectObjects' in Swift using CoreML.
-// @ts-ignore
-const { detectObjects } = VisionCameraProxy.getFrameProcessorPlugin('detectObjects');
-
 export const useLocalInference = () => {
   const { isLocalMode, setDetections } = useVisionStore();
   const { resize } = useResizePlugin();
@@ -31,23 +26,20 @@ export const useLocalInference = () => {
     
     if (!isLocalMode) return;
 
+    // Retrieve plugin inside the worklet context
+    const plugin = VisionCameraProxy.getFrameProcessorPlugin('detectObjects');
+
     runAtTargetFps(10, () => {
-      // 1. Resize the frame to YOLOv10 input size (e.g., 640x640)
-      // This uses the vision-camera-resize-plugin for high efficiency
+      // 1. Resize the frame
       const resized = resize(frame, {
-        size: {
-          width: 640,
-          height: 640,
-        },
+        size: { width: 640, height: 640 },
         pixelFormat: 'rgb',
         dataType: 'uint8',
       });
 
-      // 2. Run the CoreML Inference via a Native Frame Processor Plugin
-      // Note: This plugin must be implemented on the native (Swift) side.
-      // It takes the resized frame and returns detected objects.
-      if (detectObjects) {
-        const results = detectObjects(resized) as any[];
+      // 2. Run Inference
+      if (plugin) {
+        const results = plugin.call(resized) as any[];
         
         if (results) {
           const mappedDetections: Detection[] = results.map((det) => ({
