@@ -1,0 +1,12 @@
+---
+alwaysApply: false
+---
+
+review process of deploying the expo eas build and submit
+
+write and update file name format <foldername>-<deployed-feature>-deploy-eas.md
+- if these are new issues/notes append new documenation and do not delete, overwrite previous logs
+- note deploy methods
+- note issue/solution methods
+- note appraches that worked
+- note and remember and write down for this experience to assist in past and future deployments

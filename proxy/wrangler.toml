@@ -1,13 +1,21 @@
 name = "extra-vision-inference-production"
 main = "index.ts"
-compatibility_date = "2024-01-01"
+compatibility_date = "2024-12-27"
 
 [vars]
 ROBOFLOW_WORKSPACE = "purple"
 ROBOFLOW_WORKFLOW_ID = "extra-vision-ai"
 
+[env.production]
+name = "extra-vision-inference-production"
+compatibility_date = "2024-12-27"
+[env.production.vars]
+ROBOFLOW_WORKSPACE = "purple"
+ROBOFLOW_WORKFLOW_ID = "extra-vision-ai"
+
 [env.staging]
 name = "extra-vision-inference-staging"
+compatibility_date = "2024-12-27"
 [env.staging.vars]
 ROBOFLOW_WORKSPACE = "purple"
 ROBOFLOW_WORKFLOW_ID = "extra-vision-ai"

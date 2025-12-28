@@ -4,7 +4,7 @@ export default ({ config }) => ({
   ...config,
   name: "Extra Vision AI",
   slug: "extra-vision-ai",
-  version: "1.0.1",
+  version: "1.0.2",
   orientation: "default",
   icon: "./assets/icon.png",
   userInterfaceStyle: "light",
