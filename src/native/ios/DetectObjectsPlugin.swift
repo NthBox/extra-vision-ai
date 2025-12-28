@@ -25,6 +25,18 @@ public class DetectObjectsPlugin: FrameProcessorPlugin {
     return nil
   }()
 
+  // Complete COCO classes for YOLOv10
+  private static let COCO_CLASSES = [
+    0: "person", 1: "bicycle", 2: "car", 3: "motorcycle", 4: "airplane", 5: "bus", 6: "train", 7: "truck", 8: "boat", 9: "traffic light",
+    10: "fire hydrant", 11: "stop sign", 12: "parking meter", 13: "bench", 14: "bird", 15: "cat", 16: "dog", 17: "horse", 18: "sheep", 19: "cow",
+    20: "elephant", 21: "bear", 22: "zebra", 23: "giraffe", 24: "backpack", 25: "umbrella", 26: "handbag", 27: "tie", 28: "suitcase", 29: "frisbee",
+    30: "skis", 31: "snowboard", 32: "sports ball", 33: "kite", 34: "baseball bat", 35: "baseball glove", 36: "skateboard", 37: "surfboard", 38: "tennis racket", 39: "bottle",
+    40: "wine glass", 41: "cup", 42: "fork", 43: "knife", 44: "spoon", 45: "bowl", 46: "banana", 47: "apple", 48: "sandwich", 49: "orange",
+    50: "broccoli", 51: "carrot", 52: "hot dog", 53: "pizza", 54: "donut", 55: "cake", 56: "chair", 57: "couch", 58: "potted plant", 59: "bed",
+    60: "dining table", 61: "toilet", 62: "tv", 63: "laptop", 64: "mouse", 65: "remote", 66: "keyboard", 67: "cell phone", 68: "microwave", 69: "oven",
+    70: "toaster", 71: "sink", 72: "refrigerator", 73: "book", 74: "clock", 75: "vase", 76: "scissors", 77: "teddy bear", 78: "hair drier", 79: "toothbrush"
+  ]
+
   @objc(initWithProxy:withOptions:)
   public override init(proxy: VisionCameraProxyHolder, options: [AnyHashable: Any]?) {
     super.init(proxy: proxy, options: options)
@@ -40,7 +52,8 @@ public class DetectObjectsPlugin: FrameProcessorPlugin {
     }
 
     let request = VNCoreMLRequest(model: model)
-    request.imageCropAndScaleOption = .scaleFill
+    // Use ScaleFit to preserve aspect ratio (Letterboxing)
+    request.imageCropAndScaleOption = .scaleFit
 
     let handler = VNImageRequestHandler(cvPixelBuffer: imageBuffer, options: [:])
     do {
@@ -49,6 +62,23 @@ public class DetectObjectsPlugin: FrameProcessorPlugin {
       NSLog("[EVAI] Inference error: %@", "\(error)")
       return nil
     }
+
+    // CALCULATE LETTERBOX PARAMETERS
+    // We need these to un-map the coordinates from the square model space back to the original rect.
+    let imgW = Double(CVPixelBufferGetWidth(imageBuffer))
+    let imgH = Double(CVPixelBufferGetHeight(imageBuffer))
+    let modelSize = 640.0
+    
+    // Scale factor used by Vision to fit the image into 640x640
+    let scale = min(modelSize / imgW, modelSize / imgH)
+    
+    // The dimensions of the image inside the 640x640 buffer
+    let scaledW = imgW * scale
+    let scaledH = imgH * scale
+    
+    // Padding added by Vision (Letterboxing)
+    let padX = (modelSize - scaledW) / 2.0
+    let padY = (modelSize - scaledH) / 2.0
 
     guard let allResults = request.results else { return [] }
 
@@ -60,7 +90,7 @@ public class DetectObjectsPlugin: FrameProcessorPlugin {
                 "label": observation.labels.first?.identifier ?? "unknown",
                 "confidence": observation.confidence,
                 "x": bounds.origin.x,
-                "y": 1.0 - Double(bounds.origin.y) - Double(bounds.size.height),
+                "y": 1.0 - bounds.origin.y - bounds.size.height,
                 "w": bounds.size.width,
                 "h": bounds.size.height
             ]
@@ -74,8 +104,8 @@ public class DetectObjectsPlugin: FrameProcessorPlugin {
         var detections: [[String: Any]] = []
         
         // Handling [1, 300, 6] shape: [batch, box_index, feature_index]
-        // features: 0:x_min, 1:y_min, 2:x_max, 3:y_max, 4:conf, 5:class
-        // These are in 640x640 pixel space
+        // features: 0:x1, 1:y1, 2:x2, 3:y2, 4:conf, 5:class
+        // These coords are in the 640x640 Letterboxed space.
         let shape = multiArray.shape
         if shape.count >= 3 {
             let numBoxes = shape[1].intValue
@@ -83,20 +113,34 @@ public class DetectObjectsPlugin: FrameProcessorPlugin {
             for i in 0..<min(numBoxes, 100) {
                 let conf = multiArray[ [0, i, 4] as [NSNumber] ].doubleValue
                 
-                if conf > 0.25 {
-                    let x1 = multiArray[ [0, i, 0] as [NSNumber] ].doubleValue
-                    let y1 = multiArray[ [0, i, 1] as [NSNumber] ].doubleValue
-                    let x2 = multiArray[ [0, i, 2] as [NSNumber] ].doubleValue
-                    let y2 = multiArray[ [0, i, 3] as [NSNumber] ].doubleValue
+                if conf > 0.30 {
+                    // Raw coordinates in 640x640 space
+                    let rawX1 = multiArray[ [0, i, 0] as [NSNumber] ].doubleValue
+                    let rawY1 = multiArray[ [0, i, 1] as [NSNumber] ].doubleValue
+                    let rawX2 = multiArray[ [0, i, 2] as [NSNumber] ].doubleValue
+                    let rawY2 = multiArray[ [0, i, 3] as [NSNumber] ].doubleValue
+                    let classId = Int(multiArray[ [0, i, 5] as [NSNumber] ].doubleValue)
                     
-                    // Normalize to 0.0 - 1.0 range based on 640x640 model input
+                    // Un-map Letterboxing to get coordinates relative to the actual image area
+                    // (x - pad) / scale = original_pixel_coord
+                    let origX1 = (rawX1 - padX) / scale
+                    let origY1 = (rawY1 - padY) / scale
+                    let origX2 = (rawX2 - padX) / scale
+                    let origY2 = (rawY2 - padY) / scale
+                    
+                    // Normalize to 0-1 relative to original image dimensions
+                    let normX = origX1 / imgW
+                    let normY = origY1 / imgH
+                    let normW = (origX2 - origX1) / imgW
+                    let normH = (origY2 - origY1) / imgH
+
                     detections.append([
-                        "label": "object", 
+                        "label": DetectObjectsPlugin.COCO_CLASSES[classId] ?? "object", 
                         "confidence": conf,
-                        "x": x1 / 640.0,
-                        "y": y1 / 640.0,
-                        "w": (x2 - x1) / 640.0,
-                        "h": (y2 - y1) / 640.0
+                        "x": normX,
+                        "y": normY,
+                        "w": normW,
+                        "h": normH
                     ])
                 }
             }
