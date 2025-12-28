@@ -24,7 +24,7 @@ export default ({ config }) => ({
     [
       withMLModel,
       {
-        modelPath: "assets/models/yolov10n.mlmodel"
+        modelPath: "assets/models/yolov10n.mlpackage"
       }
     ],
     withDetectObjects
