@@ -11,7 +11,15 @@ export default ({ config }) => ({
   newArchEnabled: true,
   plugins: [
     "@config-plugins/react-native-webrtc",
-    "expo-asset"
+    "expo-asset",
+    "vision-camera-resize-plugin",
+    [
+      "react-native-vision-camera",
+      {
+        "cameraPermissionText": "This app uses the camera for real-time vision processing.",
+        "enableFrameProcessors": true
+      }
+    ]
   ],
   splash: {
     image: "./assets/splash-icon.png",

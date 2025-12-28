@@ -54,6 +54,7 @@ interface VisionState {
   threeViewMode: 'REAL' | 'SIMULATED';
   modelMode: 'FAST' | 'ACCURATE'; // FAST = YOLO, ACCURATE = SAM3
   isEnhancedMode: boolean; // Twilio TURN relay mode
+  isLocalMode: boolean;
   
   // Camera Model fields
   cameraConfig: CameraConfig;
@@ -71,6 +72,7 @@ interface VisionState {
   setThreeViewMode: (mode: 'REAL' | 'SIMULATED') => void;
   setModelMode: (mode: 'FAST' | 'ACCURATE') => void;
   setEnhancedMode: (enabled: boolean) => void;
+  setLocalMode: (enabled: boolean) => void;
   
   // Camera Model setters
   updateCameraConfig: (config: Partial<CameraConfig>) => void;
@@ -90,13 +92,17 @@ export const useVisionStore = create<VisionState>((set) => ({
   threeViewMode: 'SIMULATED',
   modelMode: 'FAST',
   isEnhancedMode: true,
+  isLocalMode: false,
   cameraConfig: CAMERA_PRESETS.WIDE,
 
   setDetections: (detections) => set({ detections }),
   setInferring: (isInferring) => set({ isInferring }),
   setImageDimensions: (width, height) => set({ imageDimensions: { width, height } }),
   updateInferenceTime: () => set({ lastInferenceTime: Date.now() }),
-  setRealTimeEnabled: (enabled) => set({ isRealTimeEnabled: enabled }),
+  setRealTimeEnabled: (enabled) => set((state) => ({ 
+    isRealTimeEnabled: enabled,
+    isLocalMode: enabled ? false : state.isLocalMode
+  })),
   setStreaming: (isStreaming) => set({ isStreaming }),
   setStreamingError: (error) => set({ streamingError: error }),
   setIsPlaying: (isPlaying) => set({ isPlaying }),
@@ -104,6 +110,10 @@ export const useVisionStore = create<VisionState>((set) => ({
   setThreeViewMode: (threeViewMode) => set({ threeViewMode }),
   setModelMode: (modelMode) => set({ modelMode }),
   setEnhancedMode: (isEnhancedMode) => set({ isEnhancedMode }),
+  setLocalMode: (enabled) => set((state) => ({ 
+    isLocalMode: enabled,
+    isRealTimeEnabled: enabled ? false : state.isRealTimeEnabled
+  })),
   
   updateCameraConfig: (config) => set((state) => ({ 
     cameraConfig: { ...state.cameraConfig, ...config } 

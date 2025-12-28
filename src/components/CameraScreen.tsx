@@ -2,10 +2,12 @@ import React, { useRef, useEffect, useCallback } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Dimensions, Switch } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { RTCView } from 'react-native-webrtc';
+import { Camera, useCameraDevice } from 'react-native-vision-camera';
 import { useCameraStore } from '../store/useCameraStore';
 import { useVisionStore } from '../store/useVisionStore';
 import { useInference } from '../hooks/useInference';
 import { useRealTimeInference } from '../hooks/useRealTimeInference';
+import { useLocalInference } from '../hooks/useLocalInference';
 import { HUDOverlay } from './HUDOverlay';
 import { ThreeViewContainer } from './ThreeView';
 
@@ -31,12 +33,17 @@ export const CameraScreen = () => {
     setModelMode,
     isEnhancedMode,
     setEnhancedMode,
+    isLocalMode,
+    setLocalMode,
     cameraConfig,
     updateCameraConfig
   } = useVisionStore();
   
   const { mutate: runInference } = useInference();
   const { stream } = useRealTimeInference();
+  const { frameProcessor } = useLocalInference();
+
+  const device = useCameraDevice('back');
 
   useEffect(() => {
     if (!permission) {
@@ -114,7 +121,16 @@ export const CameraScreen = () => {
   return (
     <View style={styles.container}>
       <View style={styles.cameraContainer}>
-        {isRealTimeEnabled ? (
+        {isLocalMode ? (
+          device && (
+            <Camera
+              style={styles.camera}
+              device={device}
+              isActive={isPlaying}
+              frameProcessor={frameProcessor}
+            />
+          )
+        ) : isRealTimeEnabled ? (
           stream ? (
             <RTCView
               streamURL={stream.toURL()}
@@ -194,6 +210,13 @@ export const CameraScreen = () => {
               onPress={() => setRealTimeEnabled(!isRealTimeEnabled)}
             >
               <Text style={styles.iconButtonText}>LIVE</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.iconButton, isLocalMode && styles.activeLocalButton]} 
+              onPress={() => setLocalMode(!isLocalMode)}
+            >
+              <Text style={styles.iconButtonText}>LOC</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
@@ -306,6 +329,9 @@ const styles = StyleSheet.create({
   },
   activeIconButton: {
     backgroundColor: '#007AFF',
+  },
+  activeLocalButton: {
+    backgroundColor: '#4CAF50',
   },
   activeEnhancedButton: {
     backgroundColor: '#FFCC00',

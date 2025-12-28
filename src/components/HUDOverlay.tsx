@@ -6,7 +6,7 @@ import { useVisionStore } from '../store/useVisionStore';
 
 export const HUDOverlay = () => {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
-  const { detections, imageDimensions, isStreaming, visualizationMode } = useVisionStore();
+  const { detections, imageDimensions, isStreaming, isLocalMode, visualizationMode } = useVisionStore();
   const [orientation, setOrientation] = useState<ScreenOrientation.Orientation>(
     ScreenOrientation.Orientation.PORTRAIT_UP
   );
@@ -97,6 +97,20 @@ export const HUDOverlay = () => {
               fontWeight="bold"
             >
               LIVE
+            </SvgText>
+          </G>
+        )}
+        {isLocalMode && (
+          <G x={screenWidth - 80} y={75}>
+            <Circle cx="0" cy="0" r="6" fill="#4CAF50" />
+            <SvgText
+              x="12"
+              y="5"
+              fill="#4CAF50"
+              fontSize="14"
+              fontWeight="bold"
+            >
+              LOCAL
             </SvgText>
           </G>
         )}
