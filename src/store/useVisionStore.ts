@@ -89,7 +89,7 @@ export const useVisionStore = create<VisionState>((set) => ({
   visualizationMode: 'CAMERA',
   threeViewMode: 'SIMULATED',
   modelMode: 'FAST',
-  isEnhancedMode: false,
+  isEnhancedMode: true,
   cameraConfig: CAMERA_PRESETS.WIDE,
 
   setDetections: (detections) => set({ detections }),

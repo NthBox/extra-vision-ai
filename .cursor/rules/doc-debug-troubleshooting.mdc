@@ -4,7 +4,7 @@ globs:
 alwaysApply: false
 ---
 review process of debugging and troubleshooting to reach the solution
-
+user folder @docs/debug
 write and update file name format <foldername>-<new-issue-name>-debug-troubleshoot.md
 - if these are new issues append new documenation and do not delete, overwrite previous logs
 - note debug methods

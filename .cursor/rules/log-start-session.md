@@ -1,0 +1,3 @@
+- working is starting
+- read the latest snapshot from @Log-Sessions for context on where to start 
+- read more previous snapshots going back in time if needed for more context

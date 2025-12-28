@@ -1,0 +1,5 @@
+- working is paused
+- create a snapshot what has happened contineued from the previouse saved log session (review the previous log session for reference)
+- snapshot includes time, summary, verbose, changes, issues, solutions, attempt, final thoughts of the current situation and potentail next steps
+- save log file <logical-order-incrementally>.md markdown
+- save to folder @Logs-Sessions

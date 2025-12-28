@@ -169,7 +169,11 @@ export default {
             sdp: offer.sdp,
             type: offer.type
           },
-          webrtc_config: wrtcParams.iceServers ? { iceServers: wrtcParams.iceServers } : null,
+          webrtc_config: wrtcParams.iceServers ? {
+            iceServers: wrtcParams.iceServers,
+            iceTransportPolicy: wrtcParams.iceTransportPolicy || 'all',
+            iceCandidatePoolSize: wrtcParams.iceCandidatePoolSize || 0
+          } : null,
           stream_output: wrtcParams.streamOutputNames || [],
         };
         

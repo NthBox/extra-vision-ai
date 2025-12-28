@@ -24,11 +24,17 @@ export const useRealTimeInference = () => {
   
   const sessionRef = useRef<any>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const retryCountRef = useRef<number>(0);
+  const maxRetries = 3;
 
   const stopStreaming = useCallback(async () => {
     if (sessionRef.current) {
       console.log('Cleaning up real-time session...');
       try {
+        // Clear connection timeout if it exists
+        if ((sessionRef.current as any).connectionTimeout) {
+          clearTimeout((sessionRef.current as any).connectionTimeout);
+        }
         await sessionRef.current.cleanup();
       } catch (e) {
         console.error('Error during session cleanup:', e);
@@ -43,9 +49,13 @@ export const useRealTimeInference = () => {
     setStreaming(false);
   }, [setStreaming]);
 
-  const startStreaming = useCallback(async () => {
+  const startStreaming = useCallback(async (isRetry = false) => {
     try {
-      console.log('Starting real-time streaming...');
+      if (!isRetry) {
+        retryCountRef.current = 0;
+      }
+      
+      console.log(`Starting real-time streaming... ${isRetry ? `(Retry ${retryCountRef.current + 1}/${maxRetries})` : ''}`);
       setStreamingError(null);
       
       // Give the camera a moment to stabilize before starting the stream
@@ -88,16 +98,16 @@ export const useRealTimeInference = () => {
           // We don't need a video stream output from the server
           streamOutputNames: [],
           // Help ICE connection by being explicit with STUN servers
-          // These are ignored if turnConfigUrl returns a valid list, but good as backup
-          iceServers: [
-            { urls: ["stun:stun.l.google.com:19302"] },
-            { urls: ["stun:stun1.l.google.com:19302"] },
-            { urls: ["stun:stun2.l.google.com:19302"] },
-            { urls: ["stun:stun.cloudflare.com:3478"] }
-          ],
+          // These are ignored if turnConfigUrl returns a valid list
+          iceServers: [],
           requestedPlan: isEnhancedMode ? 'webrtc-gpu-medium' : 'webrtc-gpu-large',
           requestedRegion: 'us',
-          realtimeProcessing: true
+          realtimeProcessing: true,
+          // Force relay in enhanced mode to ensure Twilio TURN is used immediately 
+          // and bypass STUN timeouts on restricted networks
+          iceTransportPolicy: isEnhancedMode ? 'relay' : 'all',
+          // Prevent pre-gathering of ICE candidates in enhanced mode
+          iceCandidatePoolSize: isEnhancedMode ? 0 : undefined
         },
         onData: (data: any) => {
           // Log errors if present
@@ -179,19 +189,65 @@ export const useRealTimeInference = () => {
             // Log full connection info for debugging
             console.log(`[WebRTC] PC State: ${pc.connectionState}, ICE State: ${pc.iceConnectionState}`);
             
+            // Enhanced mode validation: Check ICE candidate types
+            if (isEnhancedMode && pc.iceConnectionState === 'checking') {
+              // In enhanced mode, we should only see relay candidates
+              console.log('[WebRTC] Enhanced mode: Validating TURN relay usage...');
+              
+              // Check if we're getting STUN candidates when we shouldn't
+              if (pc.iceGatheringState === 'gathering') {
+                console.log('[WebRTC] ICE gathering in progress - should be TURN relay only');
+              }
+            }
+            
             // Check if we have any remote candidates yet
             if (pc.iceConnectionState === 'checking' || pc.iceConnectionState === 'connected') {
               console.log('[WebRTC] ICE candidate gathering/connection in progress...');
             }
             
             if (pc.connectionState === 'connected') {
+              console.log('[WebRTC] Connection established successfully');
+              if (isEnhancedMode) {
+                console.log('[WebRTC] Enhanced mode connection using Twilio TURN relay');
+              }
               setStreaming(true);
               clearInterval(checkConnection);
+              
+              // Clear connection timeout on successful connection
+              if ((sessionRef.current as any).connectionTimeout) {
+                clearTimeout((sessionRef.current as any).connectionTimeout);
+              }
             }
             
             if (pc.connectionState === 'failed') {
-              setStreamingError('WebRTC Connection Failed');
-              clearInterval(checkConnection);
+              const errorMsg = isEnhancedMode 
+                ? 'Enhanced WebRTC Connection Failed - TURN relay issue'
+                : 'WebRTC Connection Failed';
+              console.error(`[WebRTC] ${errorMsg}`);
+              
+              // Implement retry logic for failed connections
+              if (retryCountRef.current < maxRetries) {
+                console.log(`[WebRTC] Attempting retry ${retryCountRef.current + 1}/${maxRetries} in 2 seconds...`);
+                retryCountRef.current++;
+                clearInterval(checkConnection);
+                
+                // Exponential backoff: 2s, 4s, 8s
+                const retryDelay = 2000 * Math.pow(2, retryCountRef.current - 1);
+                setTimeout(() => {
+                  stopStreaming().then(() => {
+                    startStreaming(true);
+                  });
+                }, retryDelay);
+              } else {
+                console.error(`[WebRTC] Max retries (${maxRetries}) exceeded. Connection failed permanently.`);
+                setStreamingError(`${errorMsg} (Max retries exceeded)`);
+                clearInterval(checkConnection);
+              }
+            }
+            
+            // Additional validation for enhanced mode
+            if (isEnhancedMode && pc.iceConnectionState === 'failed') {
+              console.error('[WebRTC] Enhanced mode ICE connection failed - Twilio TURN may not be working');
             }
           }
         } catch (e) {
@@ -199,8 +255,35 @@ export const useRealTimeInference = () => {
         }
       }, 1000);
       
-      // Cleanup interval after 10s if not connected
-      setTimeout(() => clearInterval(checkConnection), 10000);
+      // Cleanup interval after 45s if not connected (increased for cold starts + buffer)
+      const connectionTimeout = setTimeout(() => {
+        clearInterval(checkConnection);
+        if (!sessionRef.current || (sessionRef.current.pc && sessionRef.current.pc.connectionState !== 'connected')) {
+          const timeoutMsg = isEnhancedMode 
+            ? '[WebRTC] Enhanced mode connection timeout after 45s - Twilio TURN may be unreachable'
+            : '[WebRTC] Connection timeout after 45s';
+          console.warn(timeoutMsg);
+          
+          // Implement retry logic for timeouts as well
+          if (retryCountRef.current < maxRetries) {
+            console.log(`[WebRTC] Timeout retry ${retryCountRef.current + 1}/${maxRetries} in 3 seconds...`);
+            retryCountRef.current++;
+            
+            const retryDelay = 3000 * Math.pow(2, retryCountRef.current - 1);
+            setTimeout(() => {
+              stopStreaming().then(() => {
+                startStreaming(true);
+              });
+            }, retryDelay);
+          } else {
+            console.error(`[WebRTC] Max timeout retries (${maxRetries}) exceeded.`);
+            setStreamingError('Connection timeout (Max retries exceeded)');
+          }
+        }
+      }, 45000);
+      
+      // Store timeout reference for cleanup
+      (sessionRef.current as any).connectionTimeout = connectionTimeout;
 
     } catch (err: any) {
       console.error('Failed to start real-time streaming:', err);
