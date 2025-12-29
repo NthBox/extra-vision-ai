@@ -55,13 +55,21 @@ export const HUDOverlay = () => {
 
   let scale, offsetX = 0, offsetY = 0;
 
+  // We want 'aspectFill' behavior (cover the screen)
   if (imageAspectRatio > screenAspectRatio) {
+    // Image is wider than screen - match height and crop sides
     scale = screenHeight / effectiveHeight;
     offsetX = (effectiveWidth * scale - screenWidth) / 2;
   } else {
+    // Image is taller than screen - match width and crop top/bottom
     scale = screenWidth / effectiveWidth;
     offsetY = (effectiveHeight * scale - screenHeight) / 2;
   }
+
+  // Debug log for scaling once per image size change
+  useEffect(() => {
+    console.log(`[EVAI] HUD Scale Debug - UI: ${screenWidth.toFixed(0)}x${screenHeight.toFixed(0)}, Img: ${effectiveWidth}x${effectiveHeight}, Scale: ${scale.toFixed(3)}, Offset: ${offsetX.toFixed(1)},${offsetY.toFixed(1)}`);
+  }, [screenWidth, screenHeight, effectiveWidth, effectiveHeight]);
 
   // Zone of Interest (ZOI)
   const zoiWidth = screenWidth * 0.6;

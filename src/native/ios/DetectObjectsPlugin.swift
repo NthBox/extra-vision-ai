@@ -25,6 +25,9 @@ public class DetectObjectsPlugin: FrameProcessorPlugin {
     return nil
   }()
 
+  // Debug flag to log letterbox params only once
+  private static var _debugLogged: Bool? = nil
+  
   // Complete COCO classes for YOLOv10
   private static let COCO_CLASSES = [
     0: "person", 1: "bicycle", 2: "car", 3: "motorcycle", 4: "airplane", 5: "bus", 6: "train", 7: "truck", 8: "boat", 9: "traffic light",
@@ -55,7 +58,7 @@ public class DetectObjectsPlugin: FrameProcessorPlugin {
     // Use ScaleFit to preserve aspect ratio (Letterboxing)
     request.imageCropAndScaleOption = .scaleFit
 
-    let handler = VNImageRequestHandler(cvPixelBuffer: imageBuffer, options: [:])
+    let handler = VNImageRequestHandler(cvPixelBuffer: imageBuffer, orientation: self.getCGImageOrientation(frame.orientation), options: [:])
     do {
       try handler.perform([request])
     } catch {
@@ -67,18 +70,31 @@ public class DetectObjectsPlugin: FrameProcessorPlugin {
     // We need these to un-map the coordinates from the square model space back to the original rect.
     let imgW = Double(CVPixelBufferGetWidth(imageBuffer))
     let imgH = Double(CVPixelBufferGetHeight(imageBuffer))
+    
+    // IMPORTANT: If we told Vision the image has an orientation, we must account for it
+    // when calculating the letterbox. If it's portrait, width and height are swapped for scaling.
+    let isPortrait = frame.orientation == .portrait || frame.orientation == .portraitUpsideDown
+    let effectiveW = isPortrait ? imgH : imgW
+    let effectiveH = isPortrait ? imgW : imgH
+    
     let modelSize = 640.0
     
     // Scale factor used by Vision to fit the image into 640x640
-    let scale = min(modelSize / imgW, modelSize / imgH)
+    let scale = min(modelSize / effectiveW, modelSize / effectiveH)
     
     // The dimensions of the image inside the 640x640 buffer
-    let scaledW = imgW * scale
-    let scaledH = imgH * scale
+    let scaledW = effectiveW * scale
+    let scaledH = effectiveH * scale
     
     // Padding added by Vision (Letterboxing)
     let padX = (modelSize - scaledW) / 2.0
     let padY = (modelSize - scaledH) / 2.0
+    
+    // DEBUG: Log letterbox parameters once per session
+    if (DetectObjectsPlugin._debugLogged == nil) {
+        NSLog("[EVAI] LETTERBOX DEBUG - ImgSize: %.0fx%.0f, Ori: %@, Scale: %.3f, Scaled: %.0fx%.0f, Pad: %.1f,%.1f", imgW, imgH, String(describing: frame.orientation), scale, scaledW, scaledH, padX, padY)
+        DetectObjectsPlugin._debugLogged = true
+    }
 
     guard let allResults = request.results else { return [] }
 
@@ -86,6 +102,7 @@ public class DetectObjectsPlugin: FrameProcessorPlugin {
     if let results = allResults as? [VNRecognizedObjectObservation] {
         return results.map { observation in
             let bounds = observation.boundingBox
+            // Vision coordinates are normalized [0,1] with origin at bottom-left
             return [
                 "label": observation.labels.first?.identifier ?? "unknown",
                 "confidence": observation.confidence,
@@ -114,7 +131,7 @@ public class DetectObjectsPlugin: FrameProcessorPlugin {
                 let conf = multiArray[ [0, i, 4] as [NSNumber] ].doubleValue
                 
                 if conf > 0.30 {
-                    // Raw coordinates in 640x640 space
+                    // Raw coordinates in 640x640 space (Top-Left origin)
                     let rawX1 = multiArray[ [0, i, 0] as [NSNumber] ].doubleValue
                     let rawY1 = multiArray[ [0, i, 1] as [NSNumber] ].doubleValue
                     let rawX2 = multiArray[ [0, i, 2] as [NSNumber] ].doubleValue
@@ -122,17 +139,22 @@ public class DetectObjectsPlugin: FrameProcessorPlugin {
                     let classId = Int(multiArray[ [0, i, 5] as [NSNumber] ].doubleValue)
                     
                     // Un-map Letterboxing to get coordinates relative to the actual image area
-                    // (x - pad) / scale = original_pixel_coord
                     let origX1 = (rawX1 - padX) / scale
                     let origY1 = (rawY1 - padY) / scale
                     let origX2 = (rawX2 - padX) / scale
                     let origY2 = (rawY2 - padY) / scale
                     
-                    // Normalize to 0-1 relative to original image dimensions
-                    let normX = origX1 / imgW
-                    let normY = origY1 / imgH
-                    let normW = (origX2 - origX1) / imgW
-                    let normH = (origY2 - origY1) / imgH
+                    // Normalize to 0-1 relative to the EFFECTIVE dimensions (what the user sees)
+                    let normX = origX1 / effectiveW
+                    let normY = origY1 / effectiveH
+                    let normW = (origX2 - origX1) / effectiveW
+                    let normH = (origY2 - origY1) / effectiveH
+
+                    // DEBUG: Log first detection's coordinate transformation
+                    if i == 0 && detections.isEmpty {
+                        NSLog("[EVAI] COORD DEBUG - Raw: [%.1f,%.1f,%.1f,%.1f] -> Orig: [%.1f,%.1f,%.1f,%.1f] -> Norm: [%.3f,%.3f,%.3f,%.3f]", 
+                              rawX1, rawY1, rawX2, rawY2, origX1, origY1, origX2, origY2, normX, normY, normW, normH)
+                    }
 
                     detections.append([
                         "label": DetectObjectsPlugin.COCO_CLASSES[classId] ?? "object", 
@@ -149,5 +171,20 @@ public class DetectObjectsPlugin: FrameProcessorPlugin {
     }
 
     return []
+  }
+
+  private func getCGImageOrientation(_ orientation: Orientation) -> CGImagePropertyOrientation {
+    switch orientation {
+    case .portrait:
+      return .right
+    case .portraitUpsideDown:
+      return .left
+    case .landscapeLeft:
+      return .up
+    case .landscapeRight:
+      return .down
+    @unknown default:
+      return .up
+    }
   }
 }
