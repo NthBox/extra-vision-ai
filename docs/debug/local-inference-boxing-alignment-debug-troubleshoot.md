@@ -73,3 +73,47 @@ const x = det.x * effectiveW;   // Uses effective dimensions (matches Swift)
 - **Cross-Language Parity**: Always verify that normalization in one language matches denormalization in another. Log both sides with the same coordinate values to catch mismatches early.
 - **Validation First**: Create validation utilities before implementing fixes to verify the solution works and prevent regressions.
 - **Code Path Isolation**: Verify that fixes only affect the intended code path (local mode) and don't break other modes (manual mode) that use separate code paths.
+
+---
+
+## Issue Resolution (2025-01-XX): Local Model Distraction Filtering (TV/Monitor Removal)
+
+### Problem Identified
+During home testing, the local nano model (YOLOv10n) was detecting the TV/Laptop/Monitor as the primary object with high confidence, effectively "blocking" detection of the cars/people inside the screen. The label mapping was renaming road objects but allowing all other COCO categories (like `tv`, `laptop`) to pass through to the HUD.
+
+### Debug Methods
+- **Visual Verification**: Noticed `tv` and `laptop` labels appearing on screen in local mode.
+- **Code Review**: Identified that `COCO_LABEL_MAP[det.label] || det.label` in `useLocalInference.ts` was explicitly falling back to the raw label if not found in the map, instead of filtering it out.
+
+### Troubleshoot Methods
+- **Class Analysis**: Reviewed `src/native/ios/DetectObjectsPlugin.swift` to see the full list of 80 COCO classes available to the model.
+- **Filter Implementation**: Tested adding a `.filter()` stage to the worklet pipeline.
+
+### Approaches That Worked
+1. **Explicit Road Object Filtering**: Added `results.filter(det => COCO_LABEL_MAP[det.label] !== undefined)` to ensure only Pedestrians, Vehicles, and Cyclists are processed.
+2. **Strict Label Mapping**: Changed the mapping logic to strictly use the mapped label from `COCO_LABEL_MAP`, removing the raw label fallback.
+3. **Filtered Log Output**: Added a debug log when objects are found but all are filtered out (e.g., pointing at a TV).
+
+### Implementation Details
+**File Modified**: `src/hooks/useLocalInference.ts`
+
+**Change**:
+```typescript
+// Filter out labels not in our road-object map (ignore tv, laptop, etc.)
+const roadResults = results.filter(det => COCO_LABEL_MAP[det.label] !== undefined);
+
+const mappedDetections: Detection[] = roadResults.map((det, index) => {
+  // ... transformation logic ...
+  return {
+    bbox: [x, y, w, h],
+    label: COCO_LABEL_MAP[det.label], // Strictly use mapped label
+    score: det.confidence,
+  };
+});
+```
+
+### Lessons Learned & Prevention
+- **Strict Allow-lists**: For domain-specific AI apps (like automotive safety), always use a strict allow-list for labels rather than a fallback. This prevents "noise" from general-purpose datasets (COCO) from interfering with the specific use case.
+- **Model Hierarchy Awareness**: Be aware that nano models often latch onto dominant geometric shapes (like screens). Filtering these at the post-processing layer forces the system to remain useful even in non-ideal testing environments.
+- **Worklet Lints**: VisionCamera worklets are sensitive to API changes. Always verify `VisionCameraProxy` method signatures (like adding `{}` to `initFrameProcessorPlugin`) when updating worklet logic.
+

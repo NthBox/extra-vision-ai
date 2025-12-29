@@ -48,7 +48,7 @@ export const useLocalInference = () => {
     // 4. PERSISTENT INITIALIZATION: Only run this once per session
     if ((global as any)._detectObjectsPlugin == null) {
       console.log('[EVAI] Initializing plugin singleton in worklet...');
-      (global as any)._detectObjectsPlugin = VisionCameraProxy.initFrameProcessorPlugin('detectObjects');
+      (global as any)._detectObjectsPlugin = VisionCameraProxy.initFrameProcessorPlugin('detectObjects', {});
     }
     const plugin = (global as any)._detectObjectsPlugin;
 
@@ -70,7 +70,14 @@ export const useLocalInference = () => {
         // Aggressive logging: show every detection until we confirm it works
         console.log(`[EVAI] SUCCESS! Detected ${results.length} objects`);
         
-        const mappedDetections: Detection[] = results.map((det, index) => {
+        // 1. Filter out labels not in our road-object map (ignore tv, laptop, etc.)
+        const roadResults = results.filter(det => COCO_LABEL_MAP[det.label] !== undefined);
+        
+        if (roadResults.length === 0 && (global as any)._evaiCounter % 30 === 0) {
+          console.log('[EVAI] Objects found, but none are road-related (filtered)');
+        }
+
+        const mappedDetections: Detection[] = roadResults.map((det, index) => {
           // Calculate effective dimensions (matches Swift logic in DetectObjectsPlugin.swift:76-78)
           // Dimension-based check handles all 4 orientations: landscapeLeft, landscapeRight, portrait, portraitUpsideDown
           const isPortrait = frame.height > frame.width;
@@ -90,7 +97,7 @@ export const useLocalInference = () => {
 
           return {
             bbox: [x, y, w, h],
-            label: COCO_LABEL_MAP[det.label] || det.label,
+            label: COCO_LABEL_MAP[det.label],
             score: det.confidence,
           };
         });
