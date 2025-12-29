@@ -71,7 +71,7 @@ export const WorldObject = ({ detection }: WorldObjectProps) => {
     
     if (threeViewMode === 'SIMULATED') {
       // --- Simulated Math Implementation (Tesla/Waymo style) ---
-      const MAX_RANGE = 80; // Total visual depth
+      const MAX_RANGE = 60; // Total visual depth
       const { horizontalOffset } = cameraConfig;
       
       // 1. Relative Depth (Z)
@@ -81,8 +81,8 @@ export const WorldObject = ({ detection }: WorldObjectProps) => {
       const horizon = 0.35; 
       const t = Math.max(0, (yBottom - horizon) / (1.0 - horizon));
       
-      // Steep power curve (2.5) pulls objects MUCH closer to the car.
-      const distZ = -Math.pow(1 - t, 2.5) * MAX_RANGE;
+      // Steep power curve (3.5) pulls objects MUCH closer to the car.
+      const distZ = -Math.pow(1 - t, 3.5) * MAX_RANGE;
 
       // 2. Relative Lateral (X)
       // FIX: Apply horizontal offset to calibrate center alignment
