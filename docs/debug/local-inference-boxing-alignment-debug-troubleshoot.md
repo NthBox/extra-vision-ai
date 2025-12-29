@@ -117,3 +117,36 @@ const mappedDetections: Detection[] = roadResults.map((det, index) => {
 - **Model Hierarchy Awareness**: Be aware that nano models often latch onto dominant geometric shapes (like screens). Filtering these at the post-processing layer forces the system to remain useful even in non-ideal testing environments.
 - **Worklet Lints**: VisionCamera worklets are sensitive to API changes. Always verify `VisionCameraProxy` method signatures (like adding `{}` to `initFrameProcessorPlugin`) when updating worklet logic.
 
+---
+
+## Issue Resolution (2025-01-XX): Stale Detection Persistence During Mode Switch
+
+### Problem Identified
+When switching between Manual Mode and Local Mode, bounding boxes from the previous mode would remain on screen until the new mode produced its first result. This caused visual "ghosting" of boxes that were potentially misaligned or no longer valid.
+
+### Debug Methods
+- **Visual Verification**: Toggled between "LOC" and "LIVE" modes and observed boxes persisting across the transition.
+- **State Inspection**: Reviewed `useVisionStore.ts` and confirmed `setLocalMode` and `setRealTimeEnabled` only modified the mode flags but left the `detections` array untouched.
+
+### Troubleshoot Methods
+- **Store Logic Review**: Analyzed the setter functions in the Zustand store.
+
+### Approaches That Worked
+1. **Explicit Detection Clearing**: Updated `setLocalMode` and `setRealTimeEnabled` in `src/store/useVisionStore.ts` to explicitly set `detections: []` when the mode is changed.
+
+### Implementation Details
+**File Modified**: `src/store/useVisionStore.ts`
+
+**Change**:
+```typescript
+setLocalMode: (enabled) => set((state) => ({ 
+  isLocalMode: enabled,
+  isRealTimeEnabled: enabled ? false : state.isRealTimeEnabled,
+  detections: [] // Clear detections when switching to/from local mode
+})),
+```
+
+### Lessons Learned & Prevention
+- **State Cleanliness**: Always consider if a "Mode Switch" or "State Change" requires flushing stale data. In UI-heavy apps like AR/Vision, stale coordinates are often worse than no coordinates.
+- **Atomic State Updates**: Use atomic updates in state managers (like Zustand) to ensure the mode flag and the data flush happen in the same render cycle.
+
