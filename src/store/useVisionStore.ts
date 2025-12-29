@@ -101,7 +101,8 @@ export const useVisionStore = create<VisionState>((set) => ({
   updateInferenceTime: () => set({ lastInferenceTime: Date.now() }),
   setRealTimeEnabled: (enabled) => set((state) => ({ 
     isRealTimeEnabled: enabled,
-    isLocalMode: enabled ? false : state.isLocalMode
+    isLocalMode: enabled ? false : state.isLocalMode,
+    detections: [] // Clear detections when switching to/from real-time mode
   })),
   setStreaming: (isStreaming) => set({ isStreaming }),
   setStreamingError: (error) => set({ streamingError: error }),
@@ -112,7 +113,8 @@ export const useVisionStore = create<VisionState>((set) => ({
   setEnhancedMode: (isEnhancedMode) => set({ isEnhancedMode }),
   setLocalMode: (enabled) => set((state) => ({ 
     isLocalMode: enabled,
-    isRealTimeEnabled: enabled ? false : state.isRealTimeEnabled
+    isRealTimeEnabled: enabled ? false : state.isRealTimeEnabled,
+    detections: [] // Clear detections when switching to/from local mode
   })),
   
   updateCameraConfig: (config) => set((state) => ({ 
