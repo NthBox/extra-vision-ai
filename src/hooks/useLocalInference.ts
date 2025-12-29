@@ -71,15 +71,21 @@ export const useLocalInference = () => {
         console.log(`[EVAI] SUCCESS! Detected ${results.length} objects`);
         
         const mappedDetections: Detection[] = results.map((det, index) => {
-          // Convert normalized (0-1) coordinates to pixel coordinates
-          const x = det.x * frame.width;
-          const y = det.y * frame.height;
-          const w = det.w * frame.width;
-          const h = det.h * frame.height;
+          // Calculate effective dimensions (matches Swift logic in DetectObjectsPlugin.swift:76-78)
+          // Dimension-based check handles all 4 orientations: landscapeLeft, landscapeRight, portrait, portraitUpsideDown
+          const isPortrait = frame.height > frame.width;
+          const effectiveW = isPortrait ? frame.height : frame.width;
+          const effectiveH = isPortrait ? frame.width : frame.height;
+
+          // Convert normalized coordinates using EFFECTIVE dimensions (matches Swift normalization)
+          const x = det.x * effectiveW;
+          const y = det.y * effectiveH;
+          const w = det.w * effectiveW;
+          const h = det.h * effectiveH;
 
           // Log the first box's coordinates every 2 seconds
           if (index === 0 && (global as any)._evaiCounter % 60 === 0) {
-            console.log(`[EVAI] Box 0 - Normalized: [${det.x.toFixed(2)}, ${det.y.toFixed(2)}], Pixels: [${x.toFixed(0)}, ${y.toFixed(0)}]`);
+            console.log(`[EVAI] Box 0 - Normalized: [${det.x.toFixed(2)}, ${det.y.toFixed(2)}], Pixels: [${x.toFixed(0)}, ${y.toFixed(0)}], Effective: ${effectiveW}x${effectiveH}`);
           }
 
           return {
