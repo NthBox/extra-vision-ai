@@ -1,19 +1,20 @@
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Dimensions, Switch } from 'react-native';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import { RTCView } from 'react-native-webrtc';
-import { Camera, useCameraDevice } from 'react-native-vision-camera';
+import { Camera, useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
+import * as FileSystem from 'expo-file-system/legacy';
 import { useCameraStore } from '../store/useCameraStore';
 import { useVisionStore } from '../store/useVisionStore';
 import { useInference } from '../hooks/useInference';
 import { useRealTimeInference } from '../hooks/useRealTimeInference';
-import { useLocalInference } from '../hooks/useLocalInference';
+import { useUnifiedInference } from '../hooks/useUnifiedInference';
 import { HUDOverlay } from './HUDOverlay';
 import { ThreeViewContainer } from './ThreeView';
 
 export const CameraScreen = () => {
-  const [permission, requestPermission] = useCameraPermissions();
-  const cameraRef = useRef<CameraView>(null);
+  const { hasPermission, requestPermission } = useCameraPermission();
+  const visionCameraRef = useRef<Camera>(null);
   
   const { isCameraReady, setIsCameraReady } = useCameraStore();
   const { 
@@ -41,40 +42,49 @@ export const CameraScreen = () => {
   
   const { mutate: runInference } = useInference();
   const { stream } = useRealTimeInference();
-  const { frameProcessor } = useLocalInference();
+  const { frameProcessor } = useUnifiedInference();
 
   const device = useCameraDevice('back');
 
   useEffect(() => {
-    if (!permission) {
+    if (!hasPermission) {
       requestPermission();
     }
-  }, [permission]);
+  }, [hasPermission]);
 
   const captureFrame = useCallback(async () => {
-    if (cameraRef.current && isCameraReady && !isInferring && !isRealTimeEnabled && isPlaying) {
+    if (visionCameraRef.current && isCameraReady && !isInferring && !isRealTimeEnabled && isPlaying && !isLocalMode) {
       try {
-        const photo = await cameraRef.current.takePictureAsync({
-          base64: true,
-          quality: 0.2,
-          scale: 0.25,
+        // Take photo using VisionCamera
+        const photo = await visionCameraRef.current.takePhoto({
+          flash: 'off',
+          enableAutoRedEyeReduction: false,
+          enableAutoStabilization: false,
         });
 
-        if (photo?.base64) {
-          if (photo.width && photo.height) {
-            setImageDimensions(photo.width, photo.height);
+        if (photo?.path) {
+          // Update dimensions
+          setImageDimensions(photo.width, photo.height);
+          
+          // Read as base64 for server inference
+          const base64 = await FileSystem.readAsStringAsync(`file://${photo.path}`, {
+            encoding: 'base64',
+          });
+          
+          runInference(base64);
+          
+          // Clean up the temp file
+          try {
+            await FileSystem.deleteAsync(`file://${photo.path}`, { idempotent: true });
+          } catch (e) {
+            // Ignore cleanup errors
           }
-          runInference(photo.base64);
         }
       } catch (error: any) {
-        const msg = error.message || '';
-        if (msg.includes('Camera unmounted') || msg.includes('Image could not be captured')) {
-          return;
-        }
         console.error('Inference capture error:', error);
       }
     }
-  }, [isCameraReady, isInferring, runInference, isRealTimeEnabled, isPlaying, setImageDimensions]);
+  }, [isCameraReady, isInferring, runInference, isRealTimeEnabled, isPlaying, isLocalMode, setImageDimensions]);
 
   // Inference Loop for manual mode
   useEffect(() => {
@@ -82,56 +92,35 @@ export const CameraScreen = () => {
     let timeoutId: any;
 
     const loop = async () => {
-      if (!isMounted || isRealTimeEnabled || !isPlaying) return;
+      if (!isMounted || isRealTimeEnabled || !isPlaying || isLocalMode) return;
       
       if (isCameraReady && !isInferring) {
         await captureFrame();
       }
       
-      // Aim for ~40ms cadence per frame (quarter of 150ms)
-      timeoutId = setTimeout(loop, 40); 
+      // Cadence for manual mode (Server-side)
+      // Higher latency means we don't need to fire as often as local mode
+      timeoutId = setTimeout(loop, 200); 
     };
 
-    if (isCameraReady && !isRealTimeEnabled && isPlaying) {
-      // Start immediately with a short delay to bootstrap cadence
-      timeoutId = setTimeout(loop, 40);
+    if (isCameraReady && !isRealTimeEnabled && isPlaying && !isLocalMode) {
+      timeoutId = setTimeout(loop, 200);
     }
 
     return () => {
       isMounted = false;
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [isCameraReady, isInferring, captureFrame, isRealTimeEnabled, isPlaying]);
+  }, [isCameraReady, isInferring, captureFrame, isRealTimeEnabled, isPlaying, isLocalMode]);
 
-  if (!permission) {
+  if (!hasPermission) {
     return <View style={styles.container}><Text>Requesting permissions...</Text></View>;
-  }
-
-  if (!permission.granted) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.message}>We need your permission to show the camera</Text>
-        <TouchableOpacity onPress={requestPermission}>
-          <Text style={styles.buttonText}>Grant Permission</Text>
-        </TouchableOpacity>
-      </View>
-    );
   }
 
   return (
     <View style={styles.container}>
       <View style={styles.cameraContainer}>
-        {isLocalMode ? (
-          device && (
-            <Camera
-              style={styles.camera}
-              device={device}
-              isActive={isPlaying}
-              frameProcessor={frameProcessor}
-              pixelFormat="yuv"
-            />
-          )
-        ) : isRealTimeEnabled ? (
+        {isRealTimeEnabled ? (
           stream ? (
             <RTCView
               streamURL={stream.toURL()}
@@ -145,15 +134,19 @@ export const CameraScreen = () => {
             </View>
           )
         ) : (
-          <CameraView
-            style={styles.camera}
-            ref={cameraRef}
-            onCameraReady={() => {
-              console.log('[EVAI] Camera Ready');
-              setIsCameraReady(true);
-            }}
-            responsiveOrientationWhenOrientationLocked
-          />
+          device && (
+            <Camera
+              ref={visionCameraRef}
+              style={styles.camera}
+              device={device}
+              isActive={isPlaying}
+              frameProcessor={frameProcessor}
+              pixelFormat="yuv"
+              photo={true}
+              onInitialized={() => setIsCameraReady(true)}
+              onError={(e) => console.error('[EVAI] Camera Error:', e)}
+            />
+          )
         )}
       </View>
 
