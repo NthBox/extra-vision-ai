@@ -112,6 +112,7 @@ export const CameraScreen = () => {
   return (
     <View style={styles.container}>
       <View style={styles.cameraContainer}>
+        {/* LIVE FEATURE DISABLED FOR RELEASE - re-enable when WebRTC/live works
         {isRealTimeEnabled ? (
           stream ? (
             <RTCView
@@ -133,6 +134,13 @@ export const CameraScreen = () => {
             responsiveOrientationWhenOrientationLocked
           />
         )}
+        */}
+        <CameraView
+          style={styles.camera}
+          ref={cameraRef}
+          onCameraReady={() => setIsCameraReady(true)}
+          responsiveOrientationWhenOrientationLocked
+        />
       </View>
 
       {visualizationMode === '3D' && (
@@ -187,12 +195,14 @@ export const CameraScreen = () => {
               <Text style={styles.playButtonText}>{isPlaying ? 'PAUSE' : 'PLAY'}</Text>
             </TouchableOpacity>
 
+            {/* LIVE FEATURE DISABLED FOR RELEASE - re-enable when WebRTC/live works
             <TouchableOpacity 
               style={[styles.iconButton, isRealTimeEnabled && styles.activeIconButton]} 
               onPress={() => setRealTimeEnabled(!isRealTimeEnabled)}
             >
               <Text style={styles.iconButtonText}>LIVE</Text>
             </TouchableOpacity>
+            */}
 
             <TouchableOpacity 
               style={[styles.iconButton, modelMode === 'ACCURATE' && styles.activeIconButton]} 

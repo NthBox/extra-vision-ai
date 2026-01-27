@@ -86,6 +86,7 @@ export const HUDOverlay = () => {
   return (
     <View style={[StyleSheet.absoluteFill, { pointerEvents: 'none' }]}>
       <Svg height="100%" width="100%" viewBox={`0 0 ${screenWidth} ${screenHeight}`}>
+        {/* LIVE FEATURE DISABLED FOR RELEASE - re-enable when WebRTC/live works
         {isStreaming && (
           <G x={screenWidth - 80} y={50}>
             <Circle cx="0" cy="0" r="6" fill="#FF3B30" />
@@ -100,6 +101,7 @@ export const HUDOverlay = () => {
             </SvgText>
           </G>
         )}
+        */}
         <Rect
           x={zoiX}
           y={zoiY}
