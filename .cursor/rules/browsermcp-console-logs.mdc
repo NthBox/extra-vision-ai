@@ -1,7 +1,0 @@
----
-description:
-globs:
-alwaysApply: false
----
-use browser mcp tool to read the console logs
-do not use other browser mcp tools schemas

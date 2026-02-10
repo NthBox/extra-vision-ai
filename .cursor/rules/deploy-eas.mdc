@@ -1,7 +1,0 @@
----
-alwaysApply: false
----
-- get files ready for testflight build and submission
-- update required files with next version number matching release
-- eas build
-- eas submit

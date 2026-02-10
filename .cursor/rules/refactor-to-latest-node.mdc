@@ -1,7 +1,0 @@
----
-description:
-globs:
-alwaysApply: false
----
-you should be using nvm use node to use the latest version of node;
-review the code you wrote to ensure it's using modules and dependency that are not legacy 
